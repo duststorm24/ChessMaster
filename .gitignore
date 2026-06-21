@@ -22,6 +22,9 @@ visionenv/
 *.bak
 *.bak-*
 
+# Large local source media. Optimized README media lives in docs/.
+ChessArm.gif
+
 # Local secrets/config overrides
 .env
 .env.*

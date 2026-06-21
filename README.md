@@ -4,6 +4,10 @@ ChessMaster is a full-stack robotic chess project: a Raspberry Pi camera app for
 
 ![Robot arm 3D UI](docs/robot-arm-ui-desktop.jpg)
 
+<p align="center">
+  <img src="docs/chess-arm-demo.gif" alt="Robot arm following the 3D inverse-kinematics UI target" width="420">
+</p>
+
 ## What This Shows
 
 - **3D robotic arm control:** `apps/robot-web` renders a Three.js arm model with draggable target controls, forward/inverse kinematics, saved positions, and Cartesian line moves.
