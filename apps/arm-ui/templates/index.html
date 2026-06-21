@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Robotic Arm Control</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">ROBOTIC ARM</div>
+        <div class="subtitle">CNC Shield + Uno + Pi</div>
+      </div>
+    </div>
+
+    <div class="top-actions">
+      <button id="btnEStop" class="btn danger">E-STOP</button>
+      <button id="btnClear" class="btn ghost">Clear</button>
+      <button id="btnEnergize" class="btn">Energize</button>
+      <button id="btnDeenergize" class="btn ghost">De-energize</button>
+      <button id="btnHomeAll" class="btn">Home All</button>
+    </div>
+  </header>
+
+  <main class="grid">
+    <section class="panel">
+      <div class="panel-title">Speeds (steps/sec)</div>
+      <div class="row">
+        <label>X</label><input id="vx" type="number" value="800" min="1" step="1">
+        <label>Y</label><input id="vy" type="number" value="3000" min="1" step="1">
+        <label>Z</label><input id="vz" type="number" value="3000" min="1" step="1">
+        <button id="btnSpeed" class="btn">Set</button>
+        <button id="btnLimits" class="btn ghost">Limits</button>
+      </div>
+      <div class="hint" id="statusLine">Connecting…</div>
+    </section>
+
+    <section class="panel axes">
+      <div class="panel-title">Axes</div>
+
+      <div class="axis" data-axis="X">
+        <div class="axis-head">
+          <div class="axis-name">X — Base</div>
+          <div class="axis-pos"><span class="posVal" id="posX">?</span> <span class="posUnit">steps</span></div>
+          <div class="pill" id="homedX">NOT HOMED</div>
+          <button class="btn sm" id="homeX">Home</button>
+        </div>
+
+        <div class="axis-body">
+          <input class="slider" id="sliderX" type="range" min="0" max="10500" value="0" />
+          <div class="axis-controls">
+            <button class="btn ghost sm" id="jogXNeg">←</button>
+            <input class="stepBox" id="stepX" type="number" value="200" step="50">
+            <button class="btn ghost sm" id="jogXPos">→</button>
+            <button class="btn sm" id="applyX">Move To</button>
+            <div class="targetReadout" id="targetX">target: 0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="axis" data-axis="Y">
+        <div class="axis-head">
+          <div class="axis-name">Y — Arm 2</div>
+          <div class="axis-pos"><span class="posVal" id="posY">?</span> <span class="posUnit">steps</span></div>
+          <div class="pill" id="homedY">NOT HOMED</div>
+          <button class="btn sm" id="homeY">Home</button>
+        </div>
+
+        <div class="axis-body">
+          <input class="slider" id="sliderY" type="range" min="0" max="49500" value="0" />
+          <div class="axis-controls">
+            <button class="btn ghost sm" id="jogYNeg">←</button>
+            <input class="stepBox" id="stepY" type="number" value="200" step="50">
+            <button class="btn ghost sm" id="jogYPos">→</button>
+            <button class="btn sm" id="applyY">Move To</button>
+            <div class="targetReadout" id="targetY">target: 0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="axis" data-axis="Z">
+        <div class="axis-head">
+          <div class="axis-name">Z — Arm 1</div>
+          <div class="axis-pos"><span class="posVal" id="posZ">?</span> <span class="posUnit">steps</span></div>
+          <div class="pill" id="homedZ">NOT HOMED</div>
+          <button class="btn sm" id="homeZ">Home</button>
+        </div>
+
+        <div class="axis-body">
+          <input class="slider" id="sliderZ" type="range" min="0" max="39000" value="0" />
+          <div class="axis-controls">
+            <button class="btn ghost sm" id="jogZNeg">←</button>
+            <input class="stepBox" id="stepZ" type="number" value="200" step="50">
+            <button class="btn ghost sm" id="jogZPos">→</button>
+            <button class="btn sm" id="applyZ">Move To</button>
+            <div class="targetReadout" id="targetZ">target: 0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="multi">
+        <div class="panel-title">Multi-Axis Move (Simultaneous)</div>
+        <div class="row">
+          <label>X target</label><input id="multiX" type="number" value="0" step="50">
+          <label>Y target</label><input id="multiY" type="number" value="0" step="50">
+          <label>Z target</label><input id="multiZ" type="number" value="0" step="50">
+          <button id="btnMoveAll" class="btn">Go</button>
+        </div>
+        <div class="hint">Targets are absolute positions (0 at home, negative away).</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-title">Saved Positions</div>
+      <div class="save-grid">
+        <div class="slot">
+          <div class="slot-title">Position 1</div>
+          <div class="slot-coords" id="p1coords">—</div>
+          <div class="slot-actions">
+            <button class="btn sm" id="p1save">Save</button>
+            <button class="btn ghost sm" id="p1go">Go</button>
+            <button class="btn ghost sm" id="p1clear">Clear</button>
+          </div>
+        </div>
+
+        <div class="slot">
+          <div class="slot-title">Position 2</div>
+          <div class="slot-coords" id="p2coords">—</div>
+          <div class="slot-actions">
+            <button class="btn sm" id="p2save">Save</button>
+            <button class="btn ghost sm" id="p2go">Go</button>
+            <button class="btn ghost sm" id="p2clear">Clear</button>
+          </div>
+        </div>
+
+        <div class="slot">
+          <div class="slot-title">Position 3</div>
+          <div class="slot-coords" id="p3coords">—</div>
+          <div class="slot-actions">
+            <button class="btn sm" id="p3save">Save</button>
+            <button class="btn ghost sm" id="p3go">Go</button>
+            <button class="btn ghost sm" id="p3clear">Clear</button>
+          </div>
+        </div>
+
+        <div class="slot">
+          <div class="slot-title">Position 4</div>
+          <div class="slot-coords" id="p4coords">—</div>
+          <div class="slot-actions">
+            <button class="btn sm" id="p4save">Save</button>
+            <button class="btn ghost sm" id="p4go">Go</button>
+            <button class="btn ghost sm" id="p4clear">Clear</button>
+          </div>
+        </div>
+      </div>
+      <div class="hint">Saved positions are stored in your browser (localStorage).</div>
+    </section>
+
+    <section class="panel log">
+      <div class="panel-title">Serial Log</div>
+      <pre id="log"></pre>
+    </section>
+  </main>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

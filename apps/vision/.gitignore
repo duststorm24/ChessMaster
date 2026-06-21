@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+.venv/
+captures/
+calibration.json
+position.json
+occupancy_model.json
+piece_model.json

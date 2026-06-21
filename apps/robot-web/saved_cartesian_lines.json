@@ -1,0 +1,17 @@
+[
+  {
+    "name": "Test straight line",
+    "start": {
+      "x": -20.0,
+      "y": 40.0,
+      "z": 22.4
+    },
+    "end": {
+      "x": -20.0,
+      "y": -41.0,
+      "z": 22.4
+    },
+    "elbow_mode": "up",
+    "segments": 24
+  }
+]

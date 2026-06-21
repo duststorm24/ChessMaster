@@ -1,0 +1,27 @@
+{
+  "mode_id": "wide",
+  "mode_label": "Full FOV",
+  "resolution": [
+    2328,
+    1748
+  ],
+  "stream_fps": 2.0,
+  "fov": "full",
+  "description": "Full sensor view",
+  "focus_mode": "manual",
+  "af_range": "full",
+  "af_speed": "normal",
+  "lens_position": 13.8,
+  "color_order": "bgr",
+  "exposure_mode": "manual",
+  "exposure_time_us": 73900,
+  "analogue_gain": 6.7,
+  "exposure_value": 0.7,
+  "brightness": 0.1,
+  "contrast": 1.6,
+  "saturation": 1.15,
+  "sharpness": 2.7,
+  "shadow_lift": 0.05,
+  "purple_fix": 0.7,
+  "jpeg_quality": 85
+}

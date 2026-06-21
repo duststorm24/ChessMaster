@@ -1,0 +1,17 @@
+[Unit]
+Description=Chess vision camera web UI
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=<pi-user>
+WorkingDirectory=/home/<pi-user>/ChessMaster/apps/vision
+Environment=HOST=0.0.0.0
+Environment=PORT=8000
+ExecStart=/usr/bin/python3 /home/<pi-user>/ChessMaster/apps/vision/app.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

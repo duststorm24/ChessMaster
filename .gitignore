@@ -1,0 +1,37 @@
+# macOS / editor metadata
+.DS_Store
+*.swp
+*.swo
+
+# Python generated files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Local Python environments
+.venv/
+venv/
+env/
+chessenv/
+visionenv/
+
+# Runtime logs and temporary files
+*.log
+*.tmp
+*.bak
+*.bak-*
+
+# Local secrets/config overrides
+.env
+.env.*
+!.env.example
+
+# Camera captures and generated datasets can grow quickly and may include private photos
+captures/
+apps/vision/captures/
+data/vision/captures/
+
+# Large CAD source archives exceed normal GitHub file limits.
+# STL exports remain tracked under hardware/cad/.
+*.f3d

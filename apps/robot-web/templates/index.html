@@ -1,0 +1,3182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Robot Arm Control</title>
+  <style>
+    :root {
+      --bg-1: #050816;
+      --bg-2: #0b1630;
+      --panel: rgba(4, 10, 24, 0.9);
+      --panel-border: rgba(70, 140, 255, 0.24);
+      --text: #eaf6ff;
+      --muted: #8fa7c7;
+      --cyan: #5cb8ff;
+      --cyan-bright: #90d4ff;
+      --blue: #2e6fff;
+      --green: #00d084;
+      --amber: #ffb547;
+      --red: #ff4d67;
+      --inactive: #4c5a73;
+      --shadow: 0 10px 34px rgba(0,0,0,0.42);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Inter, Arial, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 20% 15%, rgba(80, 150, 255, 0.16), transparent 22%),
+        radial-gradient(circle at 80% 0%, rgba(46, 111, 255, 0.18), transparent 30%),
+        radial-gradient(circle at 50% 100%, rgba(0, 90, 200, 0.16), transparent 36%),
+        linear-gradient(135deg, #020611 0%, #071224 45%, #01030a 100%);
+      background-attachment: fixed;
+      overflow-x: hidden;
+      cursor: default;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(102,230,255,0.055) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(102,230,255,0.055) 1px, transparent 1px);
+      background-size: 30px 30px;
+      mask-image: linear-gradient(to bottom, rgba(255,255,255,0.7), rgba(255,255,255,0.15));
+    }
+
+    .cursor-glow {
+      position: fixed;
+      width: 280px;
+      height: 280px;
+      border-radius: 50%;
+      pointer-events: none;
+      background: radial-gradient(circle, rgba(120,190,255,0.34) 0%, rgba(63,168,255,0.16) 35%, rgba(0,0,0,0) 72%);
+      transform: translate(-50%, -50%);
+      z-index: 0;
+      filter: blur(14px);
+      mix-blend-mode: screen;
+      transition: transform 0.05s linear;
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      max-width: 1450px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .brand-mark {
+      color: var(--cyan-bright);
+      font-size: 0.9rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      font-weight: 800;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .nav-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      text-decoration: none;
+      color: var(--text);
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: inset 0 0 10px rgba(255,255,255,0.02);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .nav-tab:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 18px rgba(92, 184, 255, 0.14);
+      border-color: rgba(144, 212, 255, 0.28);
+    }
+
+    .nav-tab-active {
+      background: linear-gradient(135deg, rgba(22, 61, 122, 0.95), rgba(46, 111, 255, 0.95));
+      border-color: rgba(144, 212, 255, 0.4);
+      box-shadow: 0 0 18px rgba(46, 111, 255, 0.24);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.4fr 0.8fr;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 18px;
+      box-shadow: var(--shadow), inset 0 0 22px rgba(102,230,255,0.04);
+      backdrop-filter: blur(10px);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      background: linear-gradient(90deg, rgba(102,230,255,0.08), rgba(255,255,255,0.02));
+    }
+
+    .panel-title {
+      font-size: 0.92rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--cyan-bright);
+    }
+
+    .panel-body {
+      padding: 18px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 2.55rem;
+      color: var(--cyan-bright);
+      text-shadow: 0 0 16px rgba(102,230,255,0.32);
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      max-width: 760px;
+      line-height: 1.5;
+    }
+
+    .hero-stats {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(120px, 1fr));
+      gap: 12px;
+    }
+
+    .stat-card {
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .stat-label {
+      color: var(--muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .stat-value {
+      margin-top: 6px;
+      font-size: 1.55rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .arm-visual-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      height: 100%;
+    }
+
+    .arm-visual {
+      position: relative;
+      flex: 1;
+      min-height: 270px;
+      border-radius: 18px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 20%, rgba(102,230,255,0.12), transparent 26%),
+        linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .arm-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(102,230,255,0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(102,230,255,0.08) 1px, transparent 1px);
+      background-size: 34px 34px;
+      opacity: 0.45;
+    }
+
+    .arm-hud-ring,
+    .arm-hud-ring::before,
+    .arm-hud-ring::after {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(102,230,255,0.22);
+      content: "";
+    }
+
+    .arm-hud-ring {
+      width: 280px;
+      height: 280px;
+      right: -80px;
+      top: -80px;
+    }
+
+    .arm-hud-ring::before {
+      inset: 24px;
+    }
+
+    .arm-hud-ring::after {
+      inset: 52px;
+    }
+
+    .robot-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .robot-glow {
+      filter: drop-shadow(0 0 10px rgba(102,230,255,0.35));
+    }
+
+    .axis-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .axis-card {
+      position: relative;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      padding: 18px;
+      border-radius: 18px;
+      box-shadow: var(--shadow), inset 0 0 18px rgba(102,230,255,0.04);
+      overflow: hidden;
+    }
+
+    .axis-card::after {
+      content: "";
+      position: absolute;
+      inset: auto -20% -40% auto;
+      width: 180px;
+      height: 180px;
+      background: radial-gradient(circle, rgba(102,230,255,0.08), transparent 65%);
+      pointer-events: none;
+    }
+
+    .axis-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 14px;
+    }
+
+    .axis-title {
+      font-size: 1.28rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .axis-subtitle {
+      margin-top: 4px;
+      color: var(--cyan);
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .axis-state-badge {
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.05);
+      font-size: 0.78rem;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .axis-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .progress-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .progress-ring {
+      width: 138px;
+      height: 138px;
+      border-radius: 50%;
+      background: conic-gradient(var(--cyan) 0deg, rgba(255,255,255,0.08) 0deg);
+      display: grid;
+      place-items: center;
+      position: relative;
+      box-shadow: inset 0 0 24px rgba(102,230,255,0.18), 0 0 22px rgba(102,230,255,0.08);
+    }
+
+    .progress-ring::before {
+      content: "";
+      position: absolute;
+      inset: 12px;
+      border-radius: 50%;
+      background: rgba(7, 14, 28, 0.96);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .progress-inner {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+    }
+
+    .progress-value {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1;
+    }
+
+    .progress-label {
+      margin-top: 6px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .distance-line {
+      width: 100%;
+      text-align: center;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #ffffff;
+      font-weight: 700;
+      box-shadow: inset 0 0 16px rgba(255,255,255,0.04), 0 0 18px rgba(0,0,0,0.16);
+    }
+
+    .telemetry-stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .telemetry-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 9px 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.035);
+      border: 1px solid rgba(255,255,255,0.06);
+      color: #d6edf8;
+      font-size: 0.95rem;
+    }
+
+    .status-value-box {
+      padding: 4px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      box-shadow: inset 0 0 10px rgba(255,255,255,0.03);
+      transition: box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .suggested-speed-box {
+      padding: 4px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(92, 184, 255, 0.28);
+      background: rgba(46, 111, 255, 0.12);
+      box-shadow: 0 0 16px rgba(46, 111, 255, 0.16), inset 0 0 12px rgba(46, 111, 255, 0.06);
+      color: #eaf6ff;
+      font-weight: 700;
+    }
+
+    .status-green {
+      color: #eaf6ff;
+      border-color: rgba(0, 208, 132, 0.45);
+      background: rgba(0, 208, 132, 0.12);
+      box-shadow: 0 0 16px rgba(0, 208, 132, 0.28), inset 0 0 12px rgba(0, 208, 132, 0.08);
+    }
+
+    .status-red {
+      color: #eaf6ff;
+      border-color: rgba(255, 77, 103, 0.45);
+      background: rgba(255, 77, 103, 0.12);
+      box-shadow: 0 0 16px rgba(255, 77, 103, 0.28), inset 0 0 12px rgba(255, 77, 103, 0.08);
+    }
+
+    .telemetry-label {
+      color: var(--muted);
+    }
+
+    label {
+      display: block;
+      margin-top: 14px;
+      margin-bottom: 8px;
+      font-weight: bold;
+      color: var(--cyan-bright);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      font-size: 0.8rem;
+    }
+
+    .control-grid {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    input[type="range"],
+    input[type="number"],
+    input[type="text"],
+    select {
+      width: 100%;
+      max-width: 300px;
+      background: rgba(255,255,255,0.08);
+      color: #ffffff;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+
+    input[type="range"] {
+      padding: 6px 0;
+      accent-color: var(--cyan);
+    }
+
+    button {
+      padding: 10px 16px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 15px;
+      color: white;
+      background: rgba(255,255,255,0.08);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 0 20px rgba(255,255,255,0.12);
+    }
+
+    button:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .forward { background: linear-gradient(135deg, #163d7a, #2e6fff); }
+    .reverse { background: linear-gradient(135deg, #163d7a, #2e6fff); }
+    .stop { background: linear-gradient(135deg, #163d7a, #2e6fff); }
+    .allstop { background: linear-gradient(135deg, #163d7a, #2e6fff); }
+    .home { background: linear-gradient(135deg, #163d7a, #2e6fff); }
+
+    .positions-panel {
+      margin-top: 18px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 18px;
+      box-shadow: var(--shadow), inset 0 0 18px rgba(102,230,255,0.04);
+      padding: 18px;
+    }
+
+    .positions-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .positions-title {
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--cyan-bright);
+      font-weight: 700;
+    }
+
+    .positions-controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .positions-controls input {
+      width: 220px;
+      max-width: 100%;
+    }
+
+    .positions-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .position-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.035);
+      border: 1px solid rgba(255,255,255,0.06);
+      flex-wrap: wrap;
+    }
+
+    .position-name {
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .position-meta {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .position-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .draggable-card {
+      cursor: grab;
+    }
+
+    .drag-hint {
+      margin-top: 6px;
+      color: var(--cyan-bright);
+      font-size: 0.82rem;
+    }
+
+    .route-dropzone {
+      display: grid;
+      gap: 10px;
+      min-height: 92px;
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px dashed rgba(92, 184, 255, 0.38);
+      background: rgba(255,255,255,0.02);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+
+    .route-dropzone.drag-active {
+      border-color: rgba(144, 212, 255, 0.9);
+      box-shadow: 0 0 18px rgba(92, 184, 255, 0.18);
+      background: rgba(46, 111, 255, 0.08);
+    }
+
+    .route-step-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      flex-wrap: wrap;
+      cursor: grab;
+    }
+
+    .route-step-card.dragging {
+      opacity: 0.45;
+    }
+
+    .route-step-main {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1 1 280px;
+      min-width: 0;
+    }
+
+    .route-step-index {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      color: #ffffff;
+      background: linear-gradient(135deg, rgba(22, 61, 122, 0.95), rgba(46, 111, 255, 0.95));
+      box-shadow: 0 0 14px rgba(46, 111, 255, 0.2);
+      flex: 0 0 auto;
+    }
+
+    .route-step-content {
+      min-width: 0;
+    }
+
+    .route-step-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      color: #eaf6ff;
+      font-size: 0.8rem;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.05);
+    }
+
+    .route-empty {
+      padding: 16px;
+      border-radius: 12px;
+      color: var(--muted);
+      text-align: center;
+      background: rgba(255,255,255,0.03);
+      border: 1px dashed rgba(255,255,255,0.08);
+    }
+
+    .status {
+      margin-top: 18px;
+      padding: 14px 16px;
+      background: rgba(10, 18, 34, 0.78);
+      border: 1px solid rgba(93, 213, 255, 0.18);
+      border-radius: 14px;
+      min-height: 30px;
+      color: #dff8ff;
+    }
+
+    .line-form-grid {
+      display: grid;
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .coord-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .line-form-note {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .scene-stage-panel {
+      margin-bottom: 18px;
+    }
+
+    .scene-shell {
+      position: relative;
+      min-height: 760px;
+      border-radius: 18px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(130, 186, 255, 0.24), transparent 36%),
+        linear-gradient(180deg, #ffffff 0%, #f5f7fb 58%, #eef3f8 100%);
+      border: 1px solid rgba(80, 120, 170, 0.22);
+      box-shadow: inset 0 0 22px rgba(90, 140, 210, 0.08);
+      transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .scene-host {
+      position: absolute;
+      inset: 0;
+    }
+
+    .scene-shell-offline {
+      background:
+        radial-gradient(circle at 50% 0%, rgba(255, 170, 180, 0.18), transparent 34%),
+        linear-gradient(180deg, #fffdfd 0%, #fff8f9 58%, #fdf2f3 100%);
+      border-color: rgba(180, 110, 120, 0.2);
+      box-shadow: inset 0 0 22px rgba(190, 110, 120, 0.08);
+    }
+
+    .scene-shell-online {
+      background:
+        radial-gradient(circle at 50% 0%, rgba(120, 220, 160, 0.18), transparent 34%),
+        linear-gradient(180deg, #fcfffd 0%, #f5fcf7 58%, #eef8f0 100%);
+      border-color: rgba(90, 160, 110, 0.24);
+      box-shadow: inset 0 0 22px rgba(90, 170, 120, 0.1);
+    }
+
+    .scene-top-overlay {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .view-widget {
+      pointer-events: auto;
+      padding: 10px 12px 12px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.86);
+      border: 1px solid rgba(36, 79, 128, 0.18);
+      box-shadow: 0 10px 28px rgba(17, 45, 78, 0.12);
+      min-width: 180px;
+    }
+
+    .view-widget-title {
+      margin-bottom: 8px;
+      color: #1b3b5e;
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      text-align: center;
+    }
+
+    .view-cube {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      align-items: center;
+    }
+
+    .view-face {
+      min-height: 38px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(28, 67, 113, 0.16);
+      background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(228, 239, 248, 0.98));
+      color: #11385e;
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .view-face-home {
+      background: linear-gradient(135deg, rgba(22, 61, 122, 0.96), rgba(46, 111, 255, 0.96));
+      color: #ffffff;
+      border-color: rgba(46, 111, 255, 0.24);
+    }
+
+    .view-spacer {
+      min-height: 38px;
+    }
+
+    .scene-overlay {
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      pointer-events: none;
+    }
+
+    .overlay-chip {
+      padding: 10px 12px;
+      border-radius: 12px;
+      color: #f3fbff;
+      background: rgba(12, 20, 33, 0.72);
+      border: 1px solid rgba(35, 79, 133, 0.2);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.12);
+      font-size: 0.88rem;
+    }
+
+    .mode-toggle-offline {
+      background: linear-gradient(135deg, #7b1c33, #ff4d67);
+      border-color: rgba(255, 77, 103, 0.34);
+    }
+
+    .mode-toggle-online {
+      background: linear-gradient(135deg, #17603b, #00d084);
+      border-color: rgba(0, 208, 132, 0.34);
+    }
+
+    .floating-label {
+      position: absolute;
+      left: 0;
+      top: 0;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 2;
+      color: #12314e;
+      font-weight: 800;
+      text-shadow:
+        0 0 2px rgba(255,255,255,0.95),
+        0 0 8px rgba(255,255,255,0.9);
+      font-size: 0.84rem;
+      line-height: 1.35;
+    }
+
+    .floating-label-hidden {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .scene-mini-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+      align-items: start;
+      margin-bottom: 18px;
+    }
+
+    .scene-note-card {
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.07);
+      background: rgba(255,255,255,0.03);
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .route-manager-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.9fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .quick-controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .quick-home {
+      background: linear-gradient(135deg, #17603b, #00d084);
+      border-color: rgba(0, 208, 132, 0.34);
+    }
+
+    .quick-stop {
+      background: linear-gradient(135deg, #7b1c33, #ff4d67);
+      border-color: rgba(255, 77, 103, 0.36);
+    }
+
+    @media (max-width: 1080px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+      .axis-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .scene-mini-grid,
+      .route-manager-grid {
+        grid-template-columns: 1fr;
+      }
+      .scene-shell {
+        min-height: 620px;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .axis-layout {
+        grid-template-columns: 1fr;
+      }
+      .hero-stats {
+        grid-template-columns: 1fr 1fr;
+      }
+      .axis-grid {
+        grid-template-columns: 1fr;
+      }
+      .coord-grid {
+        grid-template-columns: 1fr;
+      }
+      .scene-shell {
+        min-height: 500px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="cursor-glow" id="cursorGlow"></div>
+  <div class="page">
+    <div class="topbar">
+      <div class="brand-mark">Robot Arm Suite</div>
+      <div class="axis-state-badge">Unified Control</div>
+    </div>
+
+    <section class="panel scene-stage-panel">
+      <div class="panel-header">
+        <div class="quick-controls">
+          <button class="quick-home" onclick="homeAllAxes()">HOME ALL</button>
+          <button class="quick-stop" onclick="stopAxis('ALL')">E-BRAKE</button>
+        </div>
+        <div class="row">
+          <div id="sceneModeBadge" class="axis-state-badge">Offline</div>
+          <button id="sceneModeToggle" class="home">OFFLINE MODE</button>
+          <button id="sceneResetButton" class="home">MODEL HOME</button>
+          <button id="sceneCaptureStart" class="home">SET LINE START</button>
+          <button id="sceneCaptureEnd" class="home">SET LINE END</button>
+          <button id="sceneFrameButton" class="home">FRAME TARGET</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="sceneShell" class="scene-shell scene-shell-offline">
+          <div id="sceneHost" class="scene-host"></div>
+          <div class="scene-top-overlay">
+            <div class="view-widget">
+              <div class="view-widget-title">View Cube</div>
+              <div class="view-cube">
+                <div class="view-spacer"></div>
+                <button class="view-face" data-view="top">UP</button>
+                <div class="view-spacer"></div>
+                <button class="view-face" data-view="left">LEFT</button>
+                <button class="view-face view-face-home" data-view="home">HOME</button>
+                <button class="view-face" data-view="right">RIGHT</button>
+                <div class="view-spacer"></div>
+                <button class="view-face" data-view="front">FRONT</button>
+                <div class="view-spacer"></div>
+                <div class="view-spacer"></div>
+                <button class="view-face" data-view="back">BACK</button>
+                <div class="view-spacer"></div>
+              </div>
+            </div>
+          </div>
+          <div id="arm1CoordLabel" class="floating-label floating-label-hidden"></div>
+          <div id="arm2CoordLabel" class="floating-label floating-label-hidden"></div>
+          <div id="arm1AngleLabel" class="floating-label floating-label-hidden"></div>
+          <div id="arm2AngleLabel" class="floating-label floating-label-hidden"></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="scene-mini-grid">
+      <section class="positions-panel" style="margin-top: 0;">
+        <div class="positions-header">
+          <div class="positions-title">Cartesian Line Test</div>
+          <div class="positions-controls">
+            <button class="home" onclick="captureScenePoint('start')">USE SCENE AS START</button>
+            <button class="home" onclick="captureScenePoint('end')">USE SCENE AS END</button>
+            <button class="home" onclick="saveCartesianLine()">SAVE LINE</button>
+            <button id="start-cartesian" class="forward" onclick="runCartesianLineFromForm()">RUN LINE</button>
+            <button id="stop-cartesian" class="stop" onclick="stopCartesianLine()" disabled>STOP LINE</button>
+          </div>
+        </div>
+        <div class="position-card">
+          <div>
+            <div class="position-name">Straight-Line IK Check</div>
+            <div class="position-meta" id="cartesian-meta">Use the 3D scene to place a start point and end point, then save or run the line. Elbow Up is now the fixed branch.</div>
+          </div>
+          <div class="axis-state-badge" id="cartesian-badge">Inactive</div>
+        </div>
+        <div class="line-form-grid">
+          <div class="row">
+            <div style="flex: 1 1 220px;">
+              <label for="cartesianLineName">Line Name</label>
+              <input type="text" id="cartesianLineName" placeholder="Example: Shelf Edge Test">
+            </div>
+            <div style="flex: 0 1 140px;">
+              <label for="cartesianSegments">Segments</label>
+              <input type="number" id="cartesianSegments" min="2" max="120" step="1" value="24">
+            </div>
+          </div>
+          <div>
+            <label>Start XYZ (cm)</label>
+            <div class="coord-grid">
+              <input type="number" id="cartesianStartX" step="0.1" value="0" placeholder="Start X">
+              <input type="number" id="cartesianStartY" step="0.1" value="0" placeholder="Start Y">
+              <input type="number" id="cartesianStartZ" step="0.1" value="20" placeholder="Start Z">
+            </div>
+          </div>
+          <div>
+            <label>End XYZ (cm)</label>
+            <div class="coord-grid">
+              <input type="number" id="cartesianEndX" step="0.1" value="10" placeholder="End X">
+              <input type="number" id="cartesianEndY" step="0.1" value="0" placeholder="End Y">
+              <input type="number" id="cartesianEndZ" step="0.1" value="20" placeholder="End Z">
+            </div>
+          </div>
+          <div class="line-form-note">
+            Each line is run as a segmented Cartesian chase. No axis is allowed to exceed its current preset speed; the others slow down to match.
+          </div>
+        </div>
+        <div class="positions-list" id="cartesianLinesList" style="margin-top: 16px;"></div>
+      </section>
+    </div>
+
+    <div id="controls" class="axis-grid"></div>
+
+    <section class="positions-panel">
+      <div class="positions-header">
+        <div class="positions-title">Saved Positions And Route</div>
+        <div class="positions-controls">
+          <input type="text" id="positionName" placeholder="Position name">
+          <button class="home" onclick="saveCurrentPosition()">SAVE CURRENT POSITION</button>
+          <button class="home" onclick="addHomeAllToRoute()">ADD HOME ALL</button>
+          <button class="stop" onclick="clearRoutePlan()">CLEAR ROUTE</button>
+          <button id="start-sequence" class="forward" onclick="startSequenceMode()">PLAY ROUTE</button>
+          <button id="stop-sequence" class="stop" onclick="stopSequenceMode()" disabled>STOP ROUTE</button>
+        </div>
+      </div>
+      <div class="route-manager-grid">
+        <div>
+          <div class="position-card">
+            <div>
+              <div class="position-name">Queued Steps</div>
+              <div class="position-meta" id="sequence-meta">Drag saved positions here or use Add to Route. Route steps now use synchronized axis speeds so the motion is smoother.</div>
+            </div>
+            <div class="axis-state-badge" id="sequence-badge">Inactive</div>
+          </div>
+          <div class="route-dropzone" id="routeList" ondragover="handleRouteListDragOver(event)" ondrop="dropOnRouteList(event)"></div>
+        </div>
+        <div>
+          <div class="position-card" style="margin-bottom: 12px;">
+            <div>
+              <div class="position-name">Saved Positions</div>
+              <div class="position-meta">Save the robot’s current joint positions, then drag them into the route queue or run them directly.</div>
+            </div>
+          </div>
+          <div class="positions-list" id="positionsList"></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="status" id="status">Ready.</div>
+  </div>
+
+  <script>
+    const axes = [
+      { key: "Z", label: "Rotating Base", limitLive: true, suggestedSpeed: 1500, maxTravel: 10000, stepMax: 10000 },
+      { key: "X", label: "Arm 1", limitLive: true, suggestedSpeed: 1200, maxTravel: 9000, stepMax: 9000 },
+      { key: "Y", label: "Arm 2", limitLive: true, suggestedSpeed: 1200, maxTravel: 9200, stepMax: 9200 },
+      { key: "A", label: "Gripping Hand", limitLive: false, suggestedSpeed: "—", maxTravel: null, stepMax: 10000 }
+    ];
+
+    const container = document.getElementById("controls");
+    const cursorGlow = document.getElementById("cursorGlow");
+    const ROUTE_STORAGE_KEY = "robotRoutePlanV1";
+    const FIXED_ROTATING_BASE_HOME_SPEED = 1500;
+    window.latestTelemetry = null;
+    let savedPositionsCache = [];
+    let cartesianLinesCache = [];
+    let routeSteps = [];
+    let dragPayload = null;
+
+    document.addEventListener("mousemove", (event) => {
+      cursorGlow.style.left = `${event.clientX}px`;
+      cursorGlow.style.top = `${event.clientY}px`;
+    });
+
+    axes.forEach(({ key: axis, label, suggestedSpeed, maxTravel, stepMax }) => {
+      const defaultSpeed = suggestedSpeed === "—" ? 400 : suggestedSpeed;
+      const defaultDistanceText = axis === "A"
+        ? "Inactive"
+        : axis === "Z"
+          ? `0 / ${maxTravel} steps`
+          : `Unknown / ${maxTravel} steps`;
+      const card = document.createElement("div");
+      card.className = "axis-card";
+      card.innerHTML = `
+        <div class="axis-head">
+          <div>
+            <div class="axis-title">${label}</div>
+            <div class="axis-subtitle">Axis ${axis}</div>
+          </div>
+        </div>
+
+        <div class="axis-layout">
+          <div class="progress-wrap">
+            <div class="progress-ring" id="progress-${axis}" style="background: conic-gradient(var(--green) 0deg, rgba(255,255,255,0.08) 0deg);">
+              <div class="progress-inner">
+                <div class="progress-value" id="progress-value-${axis}">${axis === "Z" ? "0%" : "--"}</div>
+                <div class="progress-label">Travel</div>
+              </div>
+            </div>
+            <div class="distance-line" id="distance-${axis}">
+              ${defaultDistanceText}
+            </div>
+          </div>
+
+          <div>
+            <div class="telemetry-stack">
+              <div class="telemetry-line">
+                <span class="telemetry-label">Limit Status</span>
+                <span id="limit-text-${axis}" class="status-value-box ${axis === "Z" || axis === "X" || axis === "Y" ? "status-green" : "status-red"}">
+                  ${axis === "Z" || axis === "X" || axis === "Y" ? "Not Pressed" : "Inactive"}
+                </span>
+              </div>
+              <div class="telemetry-line">
+                <span class="telemetry-label">Calibration</span>
+                <span id="homed-${axis}" class="status-value-box status-red">
+                  ${axis === "Z" || axis === "X" || axis === "Y" ? "Not Homed" : "Inactive"}
+                </span>
+              </div>
+              <div class="telemetry-line">
+                <span class="telemetry-label">Suggested Speed</span>
+                <span class="suggested-speed-box">${suggestedSpeed}</span>
+              </div>
+            </div>
+
+            <div class="control-grid">
+              <div>
+                <label>Speed (steps/sec)</label>
+                <div class="row">
+                  <input type="range" id="speed-${axis}" min="25" max="2000" step="25" value="${defaultSpeed}" oninput="syncSpeedFromSlider('${axis}')">
+                  <input type="number" id="speed-input-${axis}" min="25" max="2000" step="25" value="${defaultSpeed}" oninput="syncSpeedFromInput('${axis}')">
+                </div>
+                <div class="telemetry-line">
+                  <span class="telemetry-label">Suggested Speed</span>
+                  <span id="speedval-${axis}">${defaultSpeed}</span>
+                </div>
+              </div>
+
+              <div>
+                <label>Steps</label>
+                <div class="row">
+                  <input type="range" id="steps-slider-${axis}" min="50" max="${stepMax}" step="50" value="1000" oninput="syncStepsFromSlider('${axis}')">
+                  <input type="number" id="steps-${axis}" min="50" max="${stepMax}" step="50" value="1000" oninput="syncStepsFromInput('${axis}')">
+                </div>
+              </div>
+
+              <div class="row">
+                <button id="forward-${axis}" class="forward" onclick="moveAxis('${axis}', 1)">Forward</button>
+                <button id="reverse-${axis}" class="reverse" onclick="moveAxis('${axis}', -1)">Reverse</button>
+                <button id="stop-${axis}" class="stop" onclick="stopAxis('${axis}')">Stop</button>
+                <button id="home-${axis}" class="home" onclick="homeAxis('${axis}')" ${axis === "Z" || axis === "X" || axis === "Y" ? "" : "disabled"}>Home</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+
+    function setProgress(axis, ratio, text) {
+      const ring = document.getElementById(`progress-${axis}`);
+      const value = document.getElementById(`progress-value-${axis}`);
+      const bounded = Math.max(0, Math.min(1, ratio));
+      const degrees = bounded * 360;
+      const hue = 120 - (120 * bounded);
+      ring.style.background = `conic-gradient(hsl(${hue}, 85%, 55%) ${degrees}deg, rgba(255,255,255,0.08) ${degrees}deg)`;
+      value.innerText = text;
+    }
+
+    function syncSpeedFromSlider(axis) {
+      const slider = document.getElementById(`speed-${axis}`);
+      const input = document.getElementById(`speed-input-${axis}`);
+      const valueLabel = document.getElementById(`speedval-${axis}`);
+      input.value = slider.value;
+      valueLabel.innerText = slider.value;
+    }
+
+    function syncSpeedFromInput(axis) {
+      const slider = document.getElementById(`speed-${axis}`);
+      const input = document.getElementById(`speed-input-${axis}`);
+      const valueLabel = document.getElementById(`speedval-${axis}`);
+
+      let value = parseInt(input.value, 10);
+      if (isNaN(value)) value = 25;
+
+      value = Math.max(parseInt(slider.min, 10), Math.min(parseInt(slider.max, 10), value));
+      value = Math.round(value / 25) * 25;
+      input.value = value;
+      slider.value = value;
+      valueLabel.innerText = value;
+    }
+
+    function syncStepsFromSlider(axis) {
+      const slider = document.getElementById(`steps-slider-${axis}`);
+      const input = document.getElementById(`steps-${axis}`);
+      input.value = slider.value;
+    }
+
+    function syncStepsFromInput(axis) {
+      const slider = document.getElementById(`steps-slider-${axis}`);
+      const input = document.getElementById(`steps-${axis}`);
+
+      let value = parseInt(input.value, 10);
+      if (isNaN(value)) value = parseInt(slider.min, 10);
+
+      value = Math.max(parseInt(slider.min, 10), Math.min(parseInt(slider.max, 10), value));
+      value = Math.round(value / 50) * 50;
+      input.value = value;
+      slider.value = value;
+    }
+
+    function getCurrentAxisPositions() {
+      const parseDistance = (value) => {
+        if (typeof value !== "number") return null;
+        return value;
+      };
+
+      return {
+        Z: parseDistance(window.latestTelemetry?.distance_z),
+        X: parseDistance(window.latestTelemetry?.distance_x),
+        Y: parseDistance(window.latestTelemetry?.distance_y),
+      };
+    }
+
+    function getDirectionForDistanceDelta(axis, delta) {
+      if (axis === "X") {
+        return delta > 0 ? 1 : -1;
+      }
+
+      if (axis === "Y" || axis === "Z") {
+        return delta > 0 ? -1 : 1;
+      }
+
+      return delta > 0 ? 1 : -1;
+    }
+
+    function getDemoAxesPayload() {
+      const payload = {};
+      ["Z", "X", "Y"].forEach(axis => {
+        payload[axis] = {
+          speed: parseInt(document.getElementById(`speed-input-${axis}`).value, 10) || 200,
+          steps: parseInt(document.getElementById(`steps-${axis}`).value, 10) || 1000,
+        };
+      });
+      return payload;
+    }
+
+    function getDemoDefaultMessage() {
+      return "Uses each axis card's current Speed and Steps settings. Base, Arm 1, and Arm 2 must all be homed before demo mode can start.";
+    }
+
+    function getRouteDefaultMessage() {
+      return `Drag saved positions here or use Add to Route. Route uses the current Base, Arm 1, and Arm 2 speed settings, and Base homing stays fixed at ${FIXED_ROTATING_BASE_HOME_SPEED} steps/sec.`;
+    }
+
+    function getCartesianDefaultMessage() {
+      return "Define a named Cartesian start and end point, then run it as a segmented straight-line test. Each segment scales the axis speeds so none of the current axis presets are exceeded.";
+    }
+
+    function getCartesianLineFromForm() {
+      return {
+        name: document.getElementById("cartesianLineName").value.trim(),
+        elbow_mode: "up",
+        segments: parseInt(document.getElementById("cartesianSegments").value, 10) || 24,
+        start: {
+          x: parseFloat(document.getElementById("cartesianStartX").value) || 0,
+          y: parseFloat(document.getElementById("cartesianStartY").value) || 0,
+          z: parseFloat(document.getElementById("cartesianStartZ").value) || 0,
+        },
+        end: {
+          x: parseFloat(document.getElementById("cartesianEndX").value) || 0,
+          y: parseFloat(document.getElementById("cartesianEndY").value) || 0,
+          z: parseFloat(document.getElementById("cartesianEndZ").value) || 0,
+        },
+      };
+    }
+
+    function fillCartesianLineForm(line) {
+      document.getElementById("cartesianLineName").value = line?.name || "";
+      document.getElementById("cartesianSegments").value = parseInt(line?.segments, 10) || 24;
+      document.getElementById("cartesianStartX").value = line?.start?.x ?? 0;
+      document.getElementById("cartesianStartY").value = line?.start?.y ?? 0;
+      document.getElementById("cartesianStartZ").value = line?.start?.z ?? 20;
+      document.getElementById("cartesianEndX").value = line?.end?.x ?? 10;
+      document.getElementById("cartesianEndY").value = line?.end?.y ?? 0;
+      document.getElementById("cartesianEndZ").value = line?.end?.z ?? 20;
+    }
+
+    function getCartesianMaxSpeedsPayload() {
+      return {
+        Z: parseInt(document.getElementById("speed-input-Z").value, 10) || 1500,
+        X: parseInt(document.getElementById("speed-input-X").value, 10) || 1200,
+        Y: parseInt(document.getElementById("speed-input-Y").value, 10) || 1200,
+      };
+    }
+
+    function updateDemoUI(demo) {
+      const badge = document.getElementById("demo-badge");
+      const meta = document.getElementById("demo-meta");
+      const startButton = document.getElementById("start-demo");
+      const stopButton = document.getElementById("stop-demo");
+
+      if (!badge || !meta || !startButton || !stopButton) {
+        return;
+      }
+
+      const isActive = !!demo?.active;
+      const hasAxisConfig = !!demo?.axes && Object.keys(demo.axes).length > 0;
+
+      badge.innerText = isActive ? "Running" : "Inactive";
+      startButton.disabled = isActive;
+      stopButton.disabled = !isActive;
+
+      if (hasAxisConfig) {
+        const labels = { Z: "Base", X: "Arm 1", Y: "Arm 2" };
+        const summary = ["Z", "X", "Y"]
+          .filter(axis => demo.axes[axis])
+          .map(axis => `${labels[axis]}: ${demo.axes[axis].steps} steps @ ${demo.axes[axis].speed}/sec`)
+          .join(" · ");
+        meta.innerText = summary;
+        return;
+      }
+
+      meta.innerText = demo?.message && demo.message !== "Inactive" ? demo.message : getDemoDefaultMessage();
+    }
+
+    function generateRouteStepId() {
+      return `route-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+
+    function createPositionRouteStep(entry) {
+      return {
+        id: generateRouteStepId(),
+        type: "position",
+        name: entry.name,
+        positions: {
+          Z: Number(entry.positions.Z),
+          X: Number(entry.positions.X),
+          Y: Number(entry.positions.Y),
+        },
+      };
+    }
+
+    function createHomeAllRouteStep() {
+      return {
+        id: generateRouteStepId(),
+        type: "home_all",
+        name: "Home All",
+      };
+    }
+
+    function normalizeStoredRouteStep(step) {
+      if (!step || typeof step !== "object") return null;
+
+      if (step.type === "home_all") {
+        return createHomeAllRouteStep();
+      }
+
+      if (step.type !== "position" || !step.positions) return null;
+
+      const parsed = {
+        Z: parseInt(step.positions.Z, 10),
+        X: parseInt(step.positions.X, 10),
+        Y: parseInt(step.positions.Y, 10),
+      };
+
+      if (![parsed.Z, parsed.X, parsed.Y].every(Number.isInteger)) return null;
+
+      return {
+        id: generateRouteStepId(),
+        type: "position",
+        name: String(step.name || "Saved Position"),
+        positions: parsed,
+      };
+    }
+
+    function persistRoutePlan() {
+      localStorage.setItem(
+        ROUTE_STORAGE_KEY,
+        JSON.stringify(routeSteps.map(step => {
+          if (step.type === "home_all") {
+            return { type: "home_all", name: "Home All" };
+          }
+
+          return {
+            type: "position",
+            name: step.name,
+            positions: step.positions,
+          };
+        }))
+      );
+    }
+
+    function loadRoutePlanFromStorage() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(ROUTE_STORAGE_KEY) || "[]");
+        routeSteps = Array.isArray(raw)
+          ? raw.map(normalizeStoredRouteStep).filter(Boolean)
+          : [];
+      } catch (err) {
+        routeSteps = [];
+      }
+      renderRoutePlan();
+    }
+
+    function updateSequenceUI(sequence) {
+      const badge = document.getElementById("sequence-badge");
+      const meta = document.getElementById("sequence-meta");
+      const startButton = document.getElementById("start-sequence");
+      const stopButton = document.getElementById("stop-sequence");
+
+      const isActive = !!sequence?.active;
+      badge.innerText = isActive ? "Running" : "Inactive";
+      startButton.disabled = isActive || !routeSteps.length;
+      stopButton.disabled = !isActive;
+
+      if (isActive && sequence?.message) {
+        meta.innerText = sequence.message;
+        return;
+      }
+
+      if (sequence?.message && sequence.message !== "Inactive") {
+        meta.innerText = sequence.message;
+        return;
+      }
+
+      if (routeSteps.length) {
+        meta.innerText = routeSteps
+          .map((step, index) => `${index + 1}. ${step.name}`)
+          .join("  ->  ");
+        return;
+      }
+
+      meta.innerText = getRouteDefaultMessage();
+    }
+
+    function updateCartesianUI(cartesian) {
+      const badge = document.getElementById("cartesian-badge");
+      const meta = document.getElementById("cartesian-meta");
+      const startButton = document.getElementById("start-cartesian");
+      const stopButton = document.getElementById("stop-cartesian");
+      const isActive = !!cartesian?.active;
+
+      badge.innerText = isActive ? "Running" : "Inactive";
+      startButton.disabled = isActive;
+      stopButton.disabled = !isActive;
+
+      if (isActive && cartesian?.message) {
+        meta.innerText = cartesian.message;
+        return;
+      }
+
+      if (cartesian?.message && cartesian.message !== "Inactive") {
+        meta.innerText = cartesian.message;
+        return;
+      }
+
+      meta.innerText = getCartesianDefaultMessage();
+    }
+
+    function renderCartesianLines() {
+      const list = document.getElementById("cartesianLinesList");
+      list.innerHTML = "";
+
+      if (!cartesianLinesCache.length) {
+        list.innerHTML = `<div class="position-card"><div class="position-meta">No saved Cartesian lines yet.</div></div>`;
+        return;
+      }
+
+      cartesianLinesCache.forEach((line, index) => {
+        const item = document.createElement("div");
+        item.className = "position-card";
+        item.innerHTML = `
+          <div>
+            <div class="position-name">${line.name}</div>
+            <div class="position-meta">
+              ${line.elbow_mode === "down" ? "Elbow Down" : "Elbow Up"} · ${line.segments} segments
+              · Start (${line.start.x}, ${line.start.y}, ${line.start.z})
+              · End (${line.end.x}, ${line.end.y}, ${line.end.z})
+            </div>
+          </div>
+          <div class="position-actions">
+            <button class="home" onclick="loadCartesianLine(${index})">LOAD</button>
+            <button class="forward" onclick="runSavedCartesianLine(${index})">RUN</button>
+            <button class="stop" onclick="deleteCartesianLine(${index})">DELETE</button>
+          </div>
+        `;
+        list.appendChild(item);
+      });
+    }
+
+    function renderRoutePlan() {
+      const list = document.getElementById("routeList");
+      list.innerHTML = "";
+
+      if (!routeSteps.length) {
+        list.innerHTML = `<div class="route-empty">Drop saved positions here, use Add to Route, or insert a Home All step.</div>`;
+        persistRoutePlan();
+        updateSequenceUI(window.latestTelemetry?.sequence);
+        return;
+      }
+
+      routeSteps.forEach((step, index) => {
+        const item = document.createElement("div");
+        item.className = "route-step-card";
+        item.dataset.routeId = step.id;
+        item.draggable = true;
+
+        const meta = step.type === "home_all"
+          ? `Returns Base, Arm 1, and Arm 2 to home. Base homing runs at ${FIXED_ROTATING_BASE_HOME_SPEED}/sec.`
+          : `Base: ${step.positions.Z} · Arm 1: ${step.positions.X} · Arm 2: ${step.positions.Y}`;
+
+        const pill = step.type === "home_all" ? "Command" : "Saved Position";
+        item.innerHTML = `
+          <div class="route-step-main">
+            <div class="route-step-index">${index + 1}</div>
+            <div class="route-step-content">
+              <div class="position-name">${step.name}</div>
+              <div class="position-meta">${meta}</div>
+              <div class="route-step-pill">${pill}</div>
+            </div>
+          </div>
+          <div class="position-actions">
+            <button class="home" onclick="moveRouteStep('${step.id}', -1)">UP</button>
+            <button class="home" onclick="moveRouteStep('${step.id}', 1)">DOWN</button>
+            <button class="stop" onclick="removeRouteStep('${step.id}')">REMOVE</button>
+          </div>
+        `;
+
+        item.addEventListener("dragstart", event => startRouteStepDrag(event, step.id));
+        item.addEventListener("dragend", () => clearDragPayload());
+        item.addEventListener("dragover", handleRouteListDragOver);
+        item.addEventListener("drop", event => dropOnRouteStep(event, step.id));
+        list.appendChild(item);
+      });
+
+      persistRoutePlan();
+      updateSequenceUI(window.latestTelemetry?.sequence);
+    }
+
+    function addSavedPositionToRoute(index) {
+      const entry = savedPositionsCache[index];
+      if (!entry) {
+        document.getElementById("status").innerText = "Saved position not found.";
+        return;
+      }
+
+      routeSteps.push(createPositionRouteStep(entry));
+      renderRoutePlan();
+      document.getElementById("status").innerText = `Added to route: ${entry.name}`;
+    }
+
+    function addHomeAllToRoute() {
+      routeSteps.push(createHomeAllRouteStep());
+      renderRoutePlan();
+      document.getElementById("status").innerText = "Added to route: Home All";
+    }
+
+    function moveRouteStep(stepId, direction) {
+      const index = routeSteps.findIndex(step => step.id === stepId);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= routeSteps.length) return;
+
+      const [step] = routeSteps.splice(index, 1);
+      routeSteps.splice(nextIndex, 0, step);
+      renderRoutePlan();
+    }
+
+    function removeRouteStep(stepId) {
+      routeSteps = routeSteps.filter(step => step.id !== stepId);
+      renderRoutePlan();
+    }
+
+    function clearRoutePlan() {
+      routeSteps = [];
+      renderRoutePlan();
+      document.getElementById("status").innerText = "Route cleared.";
+    }
+
+    function startSavedPositionDrag(event, index) {
+      dragPayload = { type: "saved-position", index };
+      event.dataTransfer.effectAllowed = "copy";
+      document.getElementById("routeList").classList.add("drag-active");
+    }
+
+    function startRouteStepDrag(event, stepId) {
+      dragPayload = { type: "route-step", stepId };
+      event.dataTransfer.effectAllowed = "move";
+      event.currentTarget.classList.add("dragging");
+      document.getElementById("routeList").classList.add("drag-active");
+    }
+
+    function clearDragPayload() {
+      dragPayload = null;
+      document.getElementById("routeList").classList.remove("drag-active");
+      document.querySelectorAll(".route-step-card").forEach(card => card.classList.remove("dragging"));
+    }
+
+    function handleRouteListDragOver(event) {
+      event.preventDefault();
+      document.getElementById("routeList").classList.add("drag-active");
+    }
+
+    function insertDraggedRouteStep(targetId = null) {
+      if (!dragPayload) return;
+
+      let targetIndex = targetId
+        ? routeSteps.findIndex(step => step.id === targetId)
+        : routeSteps.length;
+
+      if (dragPayload.type === "saved-position") {
+        const entry = savedPositionsCache[dragPayload.index];
+        if (!entry) return;
+
+        const nextStep = createPositionRouteStep(entry);
+        if (targetIndex < 0) {
+          routeSteps.push(nextStep);
+        } else {
+          routeSteps.splice(targetIndex, 0, nextStep);
+        }
+        renderRoutePlan();
+        return;
+      }
+
+      if (dragPayload.type !== "route-step") return;
+
+      const fromIndex = routeSteps.findIndex(step => step.id === dragPayload.stepId);
+      if (fromIndex < 0) return;
+      if (targetId && dragPayload.stepId === targetId) return;
+
+      const [step] = routeSteps.splice(fromIndex, 1);
+      if (targetIndex < 0) {
+        routeSteps.push(step);
+      } else {
+        if (fromIndex < targetIndex) {
+          targetIndex -= 1;
+        }
+        routeSteps.splice(targetIndex, 0, step);
+      }
+      renderRoutePlan();
+    }
+
+    function dropOnRouteList(event) {
+      event.preventDefault();
+      const targetCard = event.target.closest(".route-step-card");
+      insertDraggedRouteStep(targetCard?.dataset.routeId || null);
+      clearDragPayload();
+    }
+
+    function dropOnRouteStep(event, stepId) {
+      event.preventDefault();
+      event.stopPropagation();
+      insertDraggedRouteStep(stepId);
+      clearDragPayload();
+    }
+
+    function getRouteStepsPayload() {
+      return routeSteps.map(step => {
+        if (step.type === "home_all") {
+          return { type: "home_all", name: step.name };
+        }
+
+        return {
+          type: "position",
+          name: step.name,
+          positions: step.positions,
+        };
+      });
+    }
+
+    function getRouteSpeedsPayload() {
+      return {
+        Z: parseInt(document.getElementById("speed-input-Z").value, 10) || 1500,
+        X: parseInt(document.getElementById("speed-input-X").value, 10) || 200,
+        Y: parseInt(document.getElementById("speed-input-Y").value, 10) || 200,
+      };
+    }
+
+    async function loadSavedPositions() {
+      try {
+        const res = await fetch("/positions");
+        const data = await res.json();
+        const list = document.getElementById("positionsList");
+        list.innerHTML = "";
+
+        const positions = Array.isArray(data.positions) ? data.positions : [];
+        savedPositionsCache = positions;
+        if (!positions.length) {
+          list.innerHTML = `<div class="position-card"><div class="position-meta">No saved positions yet.</div></div>`;
+          return;
+        }
+
+        positions.forEach((entry, index) => {
+          const item = document.createElement("div");
+          item.className = "position-card draggable-card";
+          item.draggable = true;
+          item.addEventListener("dragstart", event => startSavedPositionDrag(event, index));
+          item.addEventListener("dragend", () => clearDragPayload());
+          item.innerHTML = `
+            <div>
+              <div class="position-name">${entry.name}</div>
+              <div class="position-meta">Base: ${entry.positions.Z} · Arm 1: ${entry.positions.X} · Arm 2: ${entry.positions.Y}</div>
+              <div class="drag-hint">Drag into Route Planner or use Add to Route.</div>
+            </div>
+            <div class="position-actions">
+              <button class="home" onclick="applySavedPosition(${index})">LOAD</button>
+              <button class="home" onclick="addSavedPositionToRoute(${index})">ADD TO ROUTE</button>
+              <button class="stop" onclick="deleteSavedPosition(${index})">DELETE</button>
+            </div>
+          `;
+          list.appendChild(item);
+        });
+      } catch (err) {
+        console.error("Failed to load saved positions:", err);
+      }
+    }
+
+    async function loadCartesianLines() {
+      try {
+        const res = await fetch("/cartesian-lines");
+        const data = await res.json();
+        cartesianLinesCache = Array.isArray(data.lines) ? data.lines : [];
+        renderCartesianLines();
+      } catch (err) {
+        console.error("Failed to load Cartesian lines:", err);
+      }
+    }
+
+    async function saveCurrentPosition() {
+      const current = getCurrentAxisPositions();
+      if (![current.Z, current.X, current.Y].every(v => Number.isInteger(v))) {
+        document.getElementById("status").innerText = "Cannot save until Base, Arm 1, and Arm 2 are all homed and readable.";
+        return;
+      }
+
+      const nameInput = document.getElementById("positionName");
+      const payload = {
+        name: nameInput.value.trim(),
+        positions: current,
+      };
+
+      const res = await fetch("/positions", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      document.getElementById("status").innerText = data.ok ? `Saved: ${data.position.name}` : (data.error || "Failed to save position.");
+      if (data.ok) {
+        nameInput.value = "";
+        loadSavedPositions();
+      }
+    }
+
+    async function saveCartesianLine() {
+      try {
+        const res = await fetch("/cartesian-lines", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(getCartesianLineFromForm())
+        });
+        const data = await res.json();
+        document.getElementById("status").innerText = data.ok
+          ? `Saved Cartesian line: ${data.line.name}`
+          : (data.error || "Failed to save Cartesian line.");
+        if (data.ok) {
+          fillCartesianLineForm(data.line);
+          loadCartesianLines();
+        }
+      } catch (err) {
+        console.error("Failed to save Cartesian line:", err);
+        document.getElementById("status").innerText = "Failed to save Cartesian line.";
+      }
+    }
+
+    async function deleteSavedPosition(index) {
+      const res = await fetch(`/positions/${index}`, { method: "DELETE" });
+      const data = await res.json();
+      document.getElementById("status").innerText = data.ok ? `Deleted: ${data.deleted.name}` : (data.error || "Failed to delete position.");
+      if (data.ok) {
+        loadSavedPositions();
+      }
+    }
+
+    async function deleteCartesianLine(index) {
+      try {
+        const res = await fetch(`/cartesian-lines/${index}`, { method: "DELETE" });
+        const data = await res.json();
+        document.getElementById("status").innerText = data.ok
+          ? `Deleted Cartesian line: ${data.deleted.name}`
+          : (data.error || "Failed to delete Cartesian line.");
+        if (data.ok) {
+          loadCartesianLines();
+        }
+      } catch (err) {
+        console.error("Failed to delete Cartesian line:", err);
+        document.getElementById("status").innerText = "Failed to delete Cartesian line.";
+      }
+    }
+
+    function loadCartesianLine(index) {
+      const line = cartesianLinesCache[index];
+      if (!line) {
+        document.getElementById("status").innerText = "Cartesian line not found.";
+        return;
+      }
+      fillCartesianLineForm(line);
+      document.getElementById("status").innerText = `Loaded Cartesian line: ${line.name}`;
+    }
+
+    async function applySavedPosition(index) {
+      try {
+        const entry = savedPositionsCache[index];
+        if (!entry) {
+          document.getElementById("status").innerText = "Saved position not found.";
+          return;
+        }
+        const moveResponse = await fetch("/goto_position", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            positions: entry.positions,
+            max_speeds: getCartesianMaxSpeedsPayload(),
+          })
+        });
+        const moveData = await moveResponse.json();
+        document.getElementById("status").innerText = moveData.ok
+          ? `Loaded: ${entry.name}`
+          : (moveData.error || "Failed to load saved position.");
+        if (moveData.ok) {
+          window.sceneApi?.trackRobotFor(15000);
+        }
+      } catch (err) {
+        console.error("Failed to load position:", err);
+        document.getElementById("status").innerText = "Failed to load saved position.";
+      }
+    }
+
+    async function refreshTelemetry() {
+      try {
+        const res = await fetch("/telemetry");
+        const data = await res.json();
+        window.latestTelemetry = data;
+        updateDemoUI(data.demo);
+        updateSequenceUI(data.sequence);
+        updateCartesianUI(data.cartesian);
+        window.dispatchEvent(new CustomEvent("robot-telemetry", { detail: data }));
+
+        ["A"].forEach(axis => {
+          setProgress(axis, 0, "--");
+        });
+
+        const zLimitText = document.getElementById("limit-text-Z");
+        const zDistance = document.getElementById("distance-Z");
+        const zHomed = document.getElementById("homed-Z");
+        const zForward = document.getElementById("forward-Z");
+        const zReverse = document.getElementById("reverse-Z");
+        const zHome = document.getElementById("home-Z");
+
+        const xLimitText = document.getElementById("limit-text-X");
+        const xDistance = document.getElementById("distance-X");
+        const xHomed = document.getElementById("homed-X");
+        const xForward = document.getElementById("forward-X");
+        const xReverse = document.getElementById("reverse-X");
+        const xHome = document.getElementById("home-X");
+
+        const yLimitText = document.getElementById("limit-text-Y");
+        const yDistance = document.getElementById("distance-Y");
+        const yHomed = document.getElementById("homed-Y");
+        const yForward = document.getElementById("forward-Y");
+        const yReverse = document.getElementById("reverse-Y");
+        const yHome = document.getElementById("home-Y");
+
+        ["A"].forEach(axis => {
+          document.getElementById(`limit-text-${axis}`).innerText = "Inactive";
+          document.getElementById(`limit-text-${axis}`).classList.remove("status-green");
+          document.getElementById(`limit-text-${axis}`).classList.add("status-red");
+
+          document.getElementById(`homed-${axis}`).innerText = "Inactive";
+          document.getElementById(`homed-${axis}`).classList.remove("status-green");
+          document.getElementById(`homed-${axis}`).classList.add("status-red");
+
+          document.getElementById(`distance-${axis}`).innerText = "Inactive";
+        });
+
+        if (data.limit_x) {
+          xLimitText.innerText = "Pressed";
+          xLimitText.classList.remove("status-green");
+          xLimitText.classList.add("status-red");
+        } else {
+          xLimitText.innerText = "Not Pressed";
+          xLimitText.classList.remove("status-red");
+          xLimitText.classList.add("status-green");
+        }
+
+        if (data.distance_x === null || data.distance_x === undefined || data.distance_x === "UNKNOWN") {
+          xDistance.innerText = `Unknown / ${data.x_max_distance} steps`;
+          setProgress("X", 0, "--");
+        } else {
+          const ratioX = data.x_max_distance > 0 ? data.distance_x / data.x_max_distance : 0;
+          xDistance.innerText = `${data.distance_x} / ${data.x_max_distance} steps`;
+          setProgress("X", ratioX, `${Math.round(ratioX * 100)}%`);
+        }
+
+        xHomed.innerText = data.x_homed ? "Homed" : "Not Homed";
+        xHomed.classList.toggle("status-green", !!data.x_homed);
+        xHomed.classList.toggle("status-red", !data.x_homed);
+
+        xForward.disabled = !data.x_can_move_forward;
+        xReverse.disabled = !data.x_can_move_reverse;
+        xHome.disabled = false;
+
+        if (data.limit_y) {
+          yLimitText.innerText = "Pressed";
+          yLimitText.classList.remove("status-green");
+          yLimitText.classList.add("status-red");
+        } else {
+          yLimitText.innerText = "Not Pressed";
+          yLimitText.classList.remove("status-red");
+          yLimitText.classList.add("status-green");
+        }
+
+        if (data.distance_y === null || data.distance_y === undefined || data.distance_y === "UNKNOWN") {
+          yDistance.innerText = `Unknown / ${data.y_max_distance} steps`;
+          setProgress("Y", 0, "--");
+        } else {
+          const ratioY = data.y_max_distance > 0 ? data.distance_y / data.y_max_distance : 0;
+          yDistance.innerText = `${data.distance_y} / ${data.y_max_distance} steps`;
+          setProgress("Y", ratioY, `${Math.round(ratioY * 100)}%`);
+        }
+
+        yHomed.innerText = data.y_homed ? "Homed" : "Not Homed";
+        yHomed.classList.toggle("status-green", !!data.y_homed);
+        yHomed.classList.toggle("status-red", !data.y_homed);
+
+        yForward.disabled = !data.y_can_move_forward;
+        yReverse.disabled = !data.y_can_move_reverse;
+        yHome.disabled = false;
+
+        if (data.limit_z) {
+          zLimitText.innerText = "Pressed";
+          zLimitText.classList.remove("status-green");
+          zLimitText.classList.add("status-red");
+        } else {
+          zLimitText.innerText = "Not Pressed";
+          zLimitText.classList.remove("status-red");
+          zLimitText.classList.add("status-green");
+        }
+
+        if (data.distance_z === null || data.distance_z === undefined || data.distance_z === "UNKNOWN") {
+          zDistance.innerText = `Unknown / ${data.z_max_distance} steps`;
+          setProgress("Z", 0, "--");
+        } else {
+          const ratio = data.z_max_distance > 0 ? data.distance_z / data.z_max_distance : 0;
+          zDistance.innerText = `${data.distance_z} / ${data.z_max_distance} steps`;
+          setProgress("Z", ratio, `${Math.round(ratio * 100)}%`);
+        }
+
+        zHomed.innerText = data.z_homed ? "Homed" : "Not Homed";
+        zHomed.classList.toggle("status-green", !!data.z_homed);
+        zHomed.classList.toggle("status-red", !data.z_homed);
+
+        zForward.disabled = !!data.z_at_home;
+        zReverse.disabled = (!data.z_homed) || !!data.z_at_max_distance;
+        zHome.disabled = false;
+      } catch (err) {
+        console.error("Failed to fetch telemetry:", err);
+      }
+    }
+
+    async function startDemoMode() {
+      try {
+        const res = await fetch("/demo/start", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ axes: getDemoAxesPayload() })
+        });
+
+        const data = await res.json();
+        updateDemoUI(data.demo);
+        document.getElementById("status").innerText = data.ok ? (data.message || "Demo mode started.") : (data.error || "Failed to start demo mode.");
+      } catch (err) {
+        console.error("Failed to start demo mode:", err);
+        document.getElementById("status").innerText = "Failed to start demo mode.";
+      }
+    }
+
+    async function stopDemoMode() {
+      try {
+        const res = await fetch("/demo/stop", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"}
+        });
+
+        const data = await res.json();
+        updateDemoUI(data.demo);
+        document.getElementById("status").innerText = data.ok ? (data.message || "Demo mode stopped.") : (data.error || "Failed to stop demo mode.");
+      } catch (err) {
+        console.error("Failed to stop demo mode:", err);
+        document.getElementById("status").innerText = "Failed to stop demo mode.";
+      }
+    }
+
+    async function startSequenceMode() {
+      if (!routeSteps.length) {
+        document.getElementById("status").innerText = "Add at least one route step before starting.";
+        return;
+      }
+
+      try {
+        const res = await fetch("/sequence/start", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            steps: getRouteStepsPayload(),
+            speeds: getRouteSpeedsPayload(),
+          })
+        });
+
+        const data = await res.json();
+        updateSequenceUI(data.sequence);
+        document.getElementById("status").innerText = data.ok ? (data.message || "Route started.") : (data.error || "Failed to start route.");
+        if (data.ok) {
+          window.sceneApi?.trackRobotFor(180000);
+        }
+      } catch (err) {
+        console.error("Failed to start route:", err);
+        document.getElementById("status").innerText = "Failed to start route.";
+      }
+    }
+
+    async function stopSequenceMode() {
+      try {
+        const res = await fetch("/sequence/stop", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"}
+        });
+
+        const data = await res.json();
+        updateSequenceUI(data.sequence);
+        document.getElementById("status").innerText = data.ok ? (data.message || "Route stopped.") : (data.error || "Failed to stop route.");
+        if (data.ok) {
+          window.sceneApi?.trackRobotFor(3000);
+        }
+      } catch (err) {
+        console.error("Failed to stop route:", err);
+        document.getElementById("status").innerText = "Failed to stop route.";
+      }
+    }
+
+    async function runCartesianLine(line) {
+      try {
+        const res = await fetch("/cartesian-line/start", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            line,
+            max_speeds: getCartesianMaxSpeedsPayload(),
+          })
+        });
+
+        const data = await res.json();
+        updateCartesianUI(data.cartesian);
+        document.getElementById("status").innerText = data.ok
+          ? (data.message || `Cartesian line started: ${line.name || "Unnamed Line"}`)
+          : (data.error || "Failed to start Cartesian line.");
+        if (data.ok) {
+          window.sceneApi?.trackRobotFor(180000);
+        }
+      } catch (err) {
+        console.error("Failed to start Cartesian line:", err);
+        document.getElementById("status").innerText = "Failed to start Cartesian line.";
+      }
+    }
+
+    async function runCartesianLineFromForm() {
+      await runCartesianLine(getCartesianLineFromForm());
+    }
+
+    async function runSavedCartesianLine(index) {
+      const line = cartesianLinesCache[index];
+      if (!line) {
+        document.getElementById("status").innerText = "Cartesian line not found.";
+        return;
+      }
+      fillCartesianLineForm(line);
+      await runCartesianLine(line);
+    }
+
+    async function stopCartesianLine() {
+      try {
+        const res = await fetch("/cartesian-line/stop", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"}
+        });
+        const data = await res.json();
+        updateCartesianUI(data.cartesian);
+        document.getElementById("status").innerText = data.ok
+          ? (data.message || "Cartesian line stopped.")
+          : (data.error || "Failed to stop Cartesian line.");
+        if (data.ok) {
+          window.sceneApi?.trackRobotFor(3000);
+        }
+      } catch (err) {
+        console.error("Failed to stop Cartesian line:", err);
+        document.getElementById("status").innerText = "Failed to stop Cartesian line.";
+      }
+    }
+
+    async function homeAxis(axis) {
+      const speed = parseInt(document.getElementById(`speed-input-${axis}`).value, 10) || 200;
+      const res = await fetch("/home", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ axis, speed })
+      });
+
+      const data = await res.json();
+      document.getElementById("status").innerText = data.ok ? `Sent: ${data.sent}` : `Command failed: ${data.sent}`;
+      if (data.ok) {
+        window.sceneApi?.trackRobotFor(15000);
+      }
+    }
+
+    async function homeAllAxes() {
+      const speeds = {
+        X: parseInt(document.getElementById("speed-input-X").value, 10) || 200,
+        Y: parseInt(document.getElementById("speed-input-Y").value, 10) || 200,
+        Z: parseInt(document.getElementById("speed-input-Z").value, 10) || 200,
+      };
+
+      const res = await fetch("/home_all", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ speeds })
+      });
+
+      const data = await res.json();
+      document.getElementById("status").innerText = data.ok ? `Sent: ${data.sent}` : `Command failed: ${data.sent}`;
+      if (data.ok) {
+        window.sceneApi?.trackRobotFor(20000);
+      }
+    }
+
+    async function moveAxis(axis, direction) {
+      const speed = document.getElementById(`speed-input-${axis}`).value;
+      const steps = document.getElementById(`steps-${axis}`).value;
+
+      const res = await fetch("/move_steps", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          axis,
+          speed: parseInt(speed),
+          direction: parseInt(direction),
+          steps: parseInt(steps)
+        })
+      });
+
+      const data = await res.json();
+      document.getElementById("status").innerText = data.ok ? `Sent: ${data.sent}` : `Command failed: ${data.sent}`;
+      if (data.ok) {
+        window.sceneApi?.trackRobotFor(8000);
+      }
+    }
+
+    async function stopAxis(axis) {
+      const res = await fetch("/stop", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ axis })
+      });
+
+      const data = await res.json();
+      document.getElementById("status").innerText = data.ok ? `Sent: ${data.sent}` : `Command failed: ${data.sent}`;
+      if (data.ok) {
+        window.sceneApi?.trackRobotFor(3000);
+      }
+    }
+
+    setInterval(refreshTelemetry, 350);
+    loadRoutePlanFromStorage();
+    refreshTelemetry();
+    loadSavedPositions();
+    loadCartesianLines();
+  </script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.164.1/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.164.1/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { TransformControls } from "three/addons/controls/TransformControls.js";
+
+    const MODEL = {
+      baseHeight: 16.03,
+      arm1Length: 24.08,
+      arm2Length: 25.34,
+      baseHomeDeg: 0,
+      arm1HomeDeg: 4.76,
+      arm2FoldBackOffsetDeg: 14.76,
+      baseTravelDeg: 270,
+      arm1TravelDeg: 186.24,
+      arm2TravelDeg: 188,
+      armPlaneOffsetDeg: 180,
+      baseStepsPerDegree: 10000 / 270,
+      arm1StepsPerDegree: 9000 / 186.24,
+      arm2StepsPerDegree: 9200 / 188,
+      arm2HomeRelativeDeg: 180 - 14.76,
+      arm2MinDeg: (180 - 14.76) - 188,
+      arm2MaxDeg: 180 - 14.76,
+    };
+    MODEL.baseMinDeg = 0;
+    MODEL.baseMaxDeg = MODEL.baseTravelDeg;
+    MODEL.arm1MinDeg = MODEL.arm1HomeDeg;
+    MODEL.arm1MaxDeg = MODEL.arm1HomeDeg + MODEL.arm1TravelDeg;
+
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    const degToRad = value => value * (Math.PI / 180);
+    const radToDeg = value => value * (180 / Math.PI);
+    const round = (value, digits = 1) => Number(value).toFixed(digits);
+
+    function wrapDegrees360(degrees) {
+      let normalized = degrees % 360;
+      if (normalized < 0) normalized += 360;
+      return normalized;
+    }
+
+    function normalizeDegreesSigned(degrees) {
+      let normalized = degrees % 360;
+      if (normalized > 180) normalized -= 360;
+      if (normalized < -180) normalized += 360;
+      return normalized;
+    }
+
+    function angularDistanceDegrees(left, right) {
+      return Math.abs(normalizeDegreesSigned(left - right));
+    }
+
+    function robotToWorld(point) {
+      return new THREE.Vector3(point.x, point.z, -point.y);
+    }
+
+    function worldToRobot(vector) {
+      return { x: vector.x, y: -vector.z, z: vector.y };
+    }
+
+    function computeHomeTarget() {
+      const arm1Rad = degToRad(MODEL.arm1HomeDeg);
+      const arm2RelativeRad = degToRad(MODEL.arm2HomeRelativeDeg);
+      const arm2AbsoluteRad = arm1Rad + arm2RelativeRad;
+      const radial = (MODEL.arm1Length * Math.cos(arm1Rad)) + (MODEL.arm2Length * Math.cos(arm2AbsoluteRad));
+      const planeRad = degToRad(MODEL.baseHomeDeg + MODEL.armPlaneOffsetDeg);
+      return {
+        x: Math.cos(planeRad) * radial,
+        y: Math.sin(planeRad) * radial,
+        z: MODEL.baseHeight + (MODEL.arm1Length * Math.sin(arm1Rad)) + (MODEL.arm2Length * Math.sin(arm2AbsoluteRad)),
+      };
+    }
+
+    function forwardKinematics(baseDegFromHome, arm1Deg, arm2RelativeDeg) {
+      const baseAngle = degToRad(MODEL.baseHomeDeg + baseDegFromHome + MODEL.armPlaneOffsetDeg);
+      const arm1Angle = degToRad(arm1Deg);
+      const arm2Relative = degToRad(arm2RelativeDeg);
+      const arm2Absolute = arm1Angle + arm2Relative;
+      const radial = (MODEL.arm1Length * Math.cos(arm1Angle)) + (MODEL.arm2Length * Math.cos(arm2Absolute));
+      const elbowRadial = MODEL.arm1Length * Math.cos(arm1Angle);
+      return {
+        baseDegFromHome,
+        baseDegSigned: normalizeDegreesSigned(baseDegFromHome),
+        arm1Deg,
+        arm2RelativeDeg,
+        arm2AbsoluteDeg: arm1Deg + arm2RelativeDeg,
+        position: {
+          x: Math.cos(baseAngle) * radial,
+          y: Math.sin(baseAngle) * radial,
+          z: MODEL.baseHeight + (MODEL.arm1Length * Math.sin(arm1Angle)) + (MODEL.arm2Length * Math.sin(arm2Absolute)),
+        },
+        elbow: {
+          x: Math.cos(baseAngle) * elbowRadial,
+          y: Math.sin(baseAngle) * elbowRadial,
+          z: MODEL.baseHeight + (MODEL.arm1Length * Math.sin(arm1Angle)),
+        },
+      };
+    }
+
+    function computeCandidateForBranch(target, baseOffsetDeg = 0, elbowSign = 1) {
+      const targetBearing = Math.atan2(target.y, target.x);
+      const baseDegFromHome = wrapDegrees360(radToDeg(targetBearing) - MODEL.baseHomeDeg - MODEL.armPlaneOffsetDeg + baseOffsetDeg);
+      const baseDegSigned = normalizeDegreesSigned(baseDegFromHome);
+      const radialMagnitude = Math.hypot(target.x, target.y);
+      const radial = baseOffsetDeg === 180 ? -radialMagnitude : radialMagnitude;
+      const vertical = target.z - MODEL.baseHeight;
+      const rawCosArm2 = (
+        (radial * radial) +
+        (vertical * vertical) -
+        (MODEL.arm1Length * MODEL.arm1Length) -
+        (MODEL.arm2Length * MODEL.arm2Length)
+      ) / (2 * MODEL.arm1Length * MODEL.arm2Length);
+      const clampedCosArm2 = clamp(rawCosArm2, -1, 1);
+      const sinArm2Mag = Math.sqrt(Math.max(0, 1 - (clampedCosArm2 * clampedCosArm2)));
+      const arm2Relative = Math.atan2(elbowSign * sinArm2Mag, clampedCosArm2);
+      const arm1 = Math.atan2(vertical, radial) - Math.atan2(
+        MODEL.arm2Length * Math.sin(arm2Relative),
+        MODEL.arm1Length + (MODEL.arm2Length * Math.cos(arm2Relative))
+      );
+      const arm1Deg = radToDeg(arm1);
+      const arm2RelativeDeg = radToDeg(arm2Relative);
+      const fk = forwardKinematics(baseDegFromHome, arm1Deg, arm2RelativeDeg);
+      const positionError = Math.hypot(
+        fk.position.x - target.x,
+        fk.position.y - target.y,
+        fk.position.z - target.z
+      );
+      return {
+        target: { ...target },
+        baseOffsetDeg,
+        baseDegFromHome,
+        baseDegSigned,
+        arm1Deg,
+        arm2RelativeDeg,
+        arm2AbsoluteDeg: arm1Deg + arm2RelativeDeg,
+        radialMagnitude,
+        vertical,
+        rawCosArm2,
+        positionError,
+        withinDistance: rawCosArm2 >= -1 && rawCosArm2 <= 1,
+        withinBase: baseDegFromHome >= MODEL.baseMinDeg && baseDegFromHome <= MODEL.baseMaxDeg,
+        withinArm1: arm1Deg >= MODEL.arm1MinDeg && arm1Deg <= MODEL.arm1MaxDeg,
+        withinArm2: arm2RelativeDeg >= MODEL.arm2MinDeg && arm2RelativeDeg <= MODEL.arm2MaxDeg,
+        elbow: fk.elbow,
+        endPoint: fk.position,
+      };
+    }
+
+    function solveTarget(target, priorRendered = null) {
+      const candidates = [
+        computeCandidateForBranch(target, 0, 1),
+        computeCandidateForBranch(target, 180, 1),
+        computeCandidateForBranch(target, 0, -1),
+        computeCandidateForBranch(target, 180, -1),
+      ];
+
+      const getTransitionCost = (candidate) => {
+        if (!priorRendered) {
+          return (
+            angularDistanceDegrees(candidate.baseDegFromHome, 0) * 6 +
+            Math.abs(candidate.arm1Deg - MODEL.arm1HomeDeg) +
+            Math.abs(candidate.arm2RelativeDeg - MODEL.arm2HomeRelativeDeg)
+          );
+        }
+
+        return (
+          angularDistanceDegrees(candidate.baseDegFromHome, priorRendered.baseDegFromHome) * 6 +
+          Math.abs(candidate.arm1Deg - priorRendered.arm1Deg) +
+          Math.abs(candidate.arm2RelativeDeg - priorRendered.arm2RelativeDeg) * 1.25
+        );
+      };
+
+      candidates.sort((left, right) => {
+        const leftRank = [
+          (left.withinBase ? 0 : 1) + (left.withinArm1 ? 0 : 1) + (left.withinArm2 ? 0 : 1),
+          left.withinDistance ? 0 : 1,
+          Number(left.positionError.toFixed(6)),
+          Number(getTransitionCost(left).toFixed(6)),
+        ];
+        const rightRank = [
+          (right.withinBase ? 0 : 1) + (right.withinArm1 ? 0 : 1) + (right.withinArm2 ? 0 : 1),
+          right.withinDistance ? 0 : 1,
+          Number(right.positionError.toFixed(6)),
+          Number(getTransitionCost(right).toFixed(6)),
+        ];
+        for (let index = 0; index < leftRank.length; index += 1) {
+          if (leftRank[index] < rightRank[index]) return -1;
+          if (leftRank[index] > rightRank[index]) return 1;
+        }
+        return 0;
+      });
+
+      const candidate = candidates[0];
+      return {
+        reachable: candidate.withinDistance && candidate.withinBase && candidate.withinArm1 && candidate.withinArm2 && candidate.positionError <= 0.05,
+        rendered: {
+          baseDegFromHome: candidate.baseDegFromHome,
+          baseDegSigned: candidate.baseDegSigned,
+          arm1Deg: candidate.arm1Deg,
+          arm2RelativeDeg: candidate.arm2RelativeDeg,
+          arm2AbsoluteDeg: candidate.arm2AbsoluteDeg,
+          elbow: candidate.elbow,
+          endPoint: candidate.endPoint,
+          estimatedSteps: {
+            Z: Math.round(candidate.baseDegFromHome * MODEL.baseStepsPerDegree),
+            X: Math.round((candidate.arm1Deg - MODEL.arm1HomeDeg) * MODEL.arm1StepsPerDegree),
+            Y: Math.round((MODEL.arm2HomeRelativeDeg - candidate.arm2RelativeDeg) * MODEL.arm2StepsPerDegree),
+          },
+        },
+      };
+    }
+
+    function listReachabilityCandidates(target) {
+      return [
+        computeCandidateForBranch(target, 0, 1),
+        computeCandidateForBranch(target, 180, 1),
+        computeCandidateForBranch(target, 0, -1),
+        computeCandidateForBranch(target, 180, -1),
+      ];
+    }
+
+    function isTargetReachable(target) {
+      return listReachabilityCandidates(target).some(candidate =>
+        candidate.withinDistance &&
+        candidate.withinBase &&
+        candidate.withinArm1 &&
+        candidate.withinArm2 &&
+        candidate.positionError <= 0.05
+      );
+    }
+
+    function poseFromTelemetry(telemetry) {
+      if (!telemetry || !Number.isInteger(telemetry.distance_z) || !Number.isInteger(telemetry.distance_x) || !Number.isInteger(telemetry.distance_y)) {
+        return null;
+      }
+
+      const baseDegFromHome = telemetry.distance_z / MODEL.baseStepsPerDegree;
+      const arm1Deg = MODEL.arm1HomeDeg + (telemetry.distance_x / MODEL.arm1StepsPerDegree);
+      const arm2RelativeDeg = MODEL.arm2HomeRelativeDeg - (telemetry.distance_y / MODEL.arm2StepsPerDegree);
+      const fk = forwardKinematics(baseDegFromHome, arm1Deg, arm2RelativeDeg);
+      return {
+        ...fk,
+        estimatedSteps: {
+          Z: telemetry.distance_z,
+          X: telemetry.distance_x,
+          Y: telemetry.distance_y,
+        },
+      };
+    }
+
+    function candidateToAxisPositions(rendered) {
+      return {
+        Z: Math.round(rendered.baseDegFromHome * MODEL.baseStepsPerDegree),
+        X: Math.round((rendered.arm1Deg - MODEL.arm1HomeDeg) * MODEL.arm1StepsPerDegree),
+        Y: Math.round((MODEL.arm2HomeRelativeDeg - rendered.arm2RelativeDeg) * MODEL.arm2StepsPerDegree),
+      };
+    }
+
+    const dom = {
+      sceneShell: document.getElementById("sceneShell"),
+      sceneHost: document.getElementById("sceneHost"),
+      arm1CoordLabel: document.getElementById("arm1CoordLabel"),
+      arm2CoordLabel: document.getElementById("arm2CoordLabel"),
+      arm1AngleLabel: document.getElementById("arm1AngleLabel"),
+      arm2AngleLabel: document.getElementById("arm2AngleLabel"),
+      sceneModeBadge: document.getElementById("sceneModeBadge"),
+      sceneModeToggle: document.getElementById("sceneModeToggle"),
+      sceneResetButton: document.getElementById("sceneResetButton"),
+      sceneCaptureStart: document.getElementById("sceneCaptureStart"),
+      sceneCaptureEnd: document.getElementById("sceneCaptureEnd"),
+      sceneFrameButton: document.getElementById("sceneFrameButton"),
+      cartesianStartX: document.getElementById("cartesianStartX"),
+      cartesianStartY: document.getElementById("cartesianStartY"),
+      cartesianStartZ: document.getElementById("cartesianStartZ"),
+      cartesianEndX: document.getElementById("cartesianEndX"),
+      cartesianEndY: document.getElementById("cartesianEndY"),
+      cartesianEndZ: document.getElementById("cartesianEndZ"),
+      speedZ: document.getElementById("speed-input-Z"),
+      speedX: document.getElementById("speed-input-X"),
+      speedY: document.getElementById("speed-input-Y"),
+      viewFaceButtons: Array.from(document.querySelectorAll(".view-face")),
+    };
+
+    const sceneState = {
+      mode: "offline",
+      target: computeHomeTarget(),
+      virtualSolution: null,
+      robotPose: null,
+      followRobotUntil: 0,
+      pointer: new THREE.Vector2(),
+      raycaster: new THREE.Raycaster(),
+      onlineSendHandle: null,
+      lastSentTargets: null,
+      linePreview: null,
+      lastRenderedSignature: "",
+      cameraTween: null,
+      isDraggingTarget: false,
+      currentWristWorld: null,
+      overlayAnchors: {
+        arm1: null,
+        arm2: null,
+      },
+    };
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xffffff);
+    scene.fog = new THREE.Fog(0xf4f7fb, 95, 170);
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 500);
+    const cameraHomePosition = new THREE.Vector3(58, 42, 60);
+    const cameraHomeTarget = robotToWorld(computeHomeTarget());
+    camera.position.copy(cameraHomePosition);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.setClearColor(0xffffff, 1);
+    dom.sceneHost.appendChild(renderer.domElement);
+
+    const orbitControls = new OrbitControls(camera, renderer.domElement);
+    orbitControls.enableDamping = true;
+    orbitControls.target.copy(cameraHomeTarget);
+
+    const transformControls = new TransformControls(camera, renderer.domElement);
+    transformControls.setMode("translate");
+    transformControls.setSpace("world");
+    transformControls.size = 0.9;
+    transformControls.showY = true;
+    scene.add(transformControls);
+    transformControls.addEventListener("dragging-changed", event => {
+      sceneState.isDraggingTarget = !!event.value;
+      orbitControls.enabled = !event.value;
+    });
+
+    scene.add(new THREE.HemisphereLight(0xdceaff, 0xe6edf5, 1.28));
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.35);
+    directionalLight.position.set(26, 44, 24);
+    scene.add(directionalLight);
+    const fillLight = new THREE.DirectionalLight(0xa8cfff, 0.55);
+    fillLight.position.set(-36, 26, -20);
+    scene.add(fillLight);
+
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(180, 180),
+      new THREE.MeshStandardMaterial({ color: 0xf8fbff, metalness: 0, roughness: 0.95 })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    const grid = new THREE.GridHelper(140, 28, 0x9db7d4, 0xd0dce7);
+    grid.position.y = 0.01;
+    scene.add(grid);
+
+    const workspaceGroup = new THREE.Group();
+    const angleGroup = new THREE.Group();
+    scene.add(workspaceGroup);
+    scene.add(angleGroup);
+
+    function createAxisLine(start, end, color) {
+      return new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([start, end]),
+        new THREE.LineBasicMaterial({ color })
+      );
+    }
+
+    scene.add(createAxisLine(new THREE.Vector3(-65, 0, 0), new THREE.Vector3(65, 0, 0), 0xff6d7a));
+    scene.add(createAxisLine(new THREE.Vector3(0, 0, 65), new THREE.Vector3(0, 0, -65), 0x2e6fff));
+    scene.add(createAxisLine(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 65, 0), 0x00d084));
+
+    function makeGroundTextLabel(text, color = "#0d2f56") {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 128;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = "bold 54px Arial";
+      ctx.lineWidth = 10;
+      ctx.strokeStyle = "rgba(255,255,255,0.94)";
+      ctx.fillStyle = color;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.strokeText(text, canvas.width / 2, canvas.height / 2);
+      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      const label = new THREE.Mesh(new THREE.PlaneGeometry(10.5, 5.25), material);
+      label.rotation.x = -Math.PI / 2;
+      label.renderOrder = 3;
+      return label;
+    }
+
+    const compassGroup = new THREE.Group();
+    scene.add(compassGroup);
+    const compassRadius = 13;
+    const compassCurve = new THREE.EllipseCurve(0, 0, compassRadius, compassRadius, 0, Math.PI * 2, false, 0);
+    const compassPoints = compassCurve.getPoints(96).map(point => new THREE.Vector3(point.x, 0.04, point.y));
+    compassGroup.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(compassPoints),
+      new THREE.LineBasicMaterial({ color: 0x5d7ea5, transparent: true, opacity: 0.95 })
+    ));
+    [
+      ["E 0", new THREE.Vector3(compassRadius + 4.4, 0.04, 0)],
+      ["W 180", new THREE.Vector3(-compassRadius - 5.6, 0.04, 0)],
+      ["N 90", new THREE.Vector3(0, 0.04, -compassRadius - 4.6)],
+      ["S 270", new THREE.Vector3(0, 0.04, compassRadius + 4.6)],
+    ].forEach(([label, position]) => {
+      const groundLabel = makeGroundTextLabel(label);
+      groundLabel.position.copy(position);
+      compassGroup.add(groundLabel);
+    });
+
+    const baseColumnMaterial = new THREE.MeshStandardMaterial({ color: 0x254b87, metalness: 0.35, roughness: 0.52 });
+    const link1Material = new THREE.MeshStandardMaterial({ color: 0x3f9bff, metalness: 0.28, roughness: 0.42 });
+    const link2Material = new THREE.MeshStandardMaterial({ color: 0x5cb8ff, metalness: 0.28, roughness: 0.42 });
+    const jointMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x1b3a5f, emissiveIntensity: 0.15 });
+    const errorMaterial = new THREE.MeshStandardMaterial({ color: 0xff4d67, emissive: 0x44101a, emissiveIntensity: 0.4, metalness: 0.18, roughness: 0.55 });
+
+    const armGroup = new THREE.Group();
+    scene.add(armGroup);
+    const baseColumn = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.25, MODEL.baseHeight, 28), baseColumnMaterial);
+    baseColumn.position.copy(robotToWorld({ x: 0, y: 0, z: MODEL.baseHeight / 2 }));
+    armGroup.add(baseColumn);
+    const baseJoint = new THREE.Mesh(new THREE.SphereGeometry(1.1, 24, 16), jointMaterial);
+    const elbowJoint = new THREE.Mesh(new THREE.SphereGeometry(0.9, 24, 16), jointMaterial);
+    const wristJoint = new THREE.Mesh(new THREE.SphereGeometry(0.82, 24, 16), jointMaterial);
+    armGroup.add(baseJoint, elbowJoint, wristJoint);
+    const linkGeometry = new THREE.CylinderGeometry(0.55, 0.55, 1, 18);
+    const link1 = new THREE.Mesh(linkGeometry, link1Material);
+    const link2 = new THREE.Mesh(linkGeometry, link2Material);
+    armGroup.add(link1, link2);
+
+    const targetMarker = new THREE.Mesh(
+      new THREE.SphereGeometry(0.92, 24, 18),
+      new THREE.MeshStandardMaterial({ color: 0xffb547, emissive: 0x5c2d00, emissiveIntensity: 0.5 })
+    );
+    scene.add(targetMarker);
+    transformControls.attach(targetMarker);
+
+    const desiredLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+      new THREE.LineDashedMaterial({ color: 0xffb547, dashSize: 1.1, gapSize: 0.6, transparent: true, opacity: 0.9 })
+    );
+    scene.add(desiredLine);
+
+    function updateLineGeometry(line, points) {
+      line.geometry.setFromPoints(points);
+      if (line.computeLineDistances) {
+        line.computeLineDistances();
+      }
+    }
+
+    function buildWorkspaceCloud() {
+      const positions = [];
+      const colors = [];
+      const xMin = -56;
+      const xMax = 56;
+      const yMin = -56;
+      const yMax = 56;
+      const zMin = 0;
+      const zMax = 60;
+      const xStep = 7;
+      const yStep = 7;
+      const zStep = 5;
+
+      for (let x = xMin; x <= xMax; x += xStep) {
+        for (let y = yMin; y <= yMax; y += yStep) {
+          for (let z = zMin; z <= zMax; z += zStep) {
+            const point = { x, y, z };
+            const world = robotToWorld(point);
+            const reachable = isTargetReachable(point);
+            positions.push(world.x, world.y, world.z);
+            if (reachable) {
+              colors.push(0.12, 0.78, 0.42);
+            } else {
+              colors.push(0.96, 0.34, 0.38);
+            }
+          }
+        }
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+      const cloud = new THREE.Points(
+        geometry,
+        new THREE.PointsMaterial({
+          size: 0.45,
+          transparent: true,
+          opacity: 0.2,
+          vertexColors: true,
+          sizeAttenuation: true,
+          depthWrite: false,
+        })
+      );
+      workspaceGroup.add(cloud);
+    }
+
+    function buildPlanarArcPoints(centerLocalX, centerLocalZ, radius, startDeg, endDeg, baseDegFromHome) {
+      const span = endDeg - startDeg;
+      const segments = Math.max(12, Math.ceil(Math.abs(span) / 6));
+      const points = [];
+      for (let index = 0; index <= segments; index += 1) {
+        const t = segments === 0 ? 0 : index / segments;
+        const angleDeg = startDeg + (span * t);
+        const angleRad = degToRad(angleDeg);
+        const localX = centerLocalX + (radius * Math.cos(angleRad));
+        const localZ = centerLocalZ + (radius * Math.sin(angleRad));
+        const baseRad = degToRad(MODEL.baseHomeDeg + baseDegFromHome + MODEL.armPlaneOffsetDeg);
+        points.push(robotToWorld({
+          x: Math.cos(baseRad) * localX,
+          y: Math.sin(baseRad) * localX,
+          z: localZ,
+        }));
+      }
+      return points;
+    }
+
+    function createDashedLine(points, color) {
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(points),
+        new THREE.LineDashedMaterial({ color, dashSize: 0.7, gapSize: 0.45, transparent: true, opacity: 0.95 })
+      );
+      line.computeLineDistances();
+      return line;
+    }
+
+    function createSolidLine(points, color) {
+      return new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(points),
+        new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.96 })
+      );
+    }
+
+    function updateAngleGraphics(rendered) {
+      angleGroup.clear();
+
+      const baseDegFromHome = rendered.baseDegFromHome;
+      const arm1Deg = rendered.arm1Deg;
+      const arm2AbsoluteDeg = rendered.arm2AbsoluteDeg;
+      const arm2RelativeDeg = rendered.arm2RelativeDeg;
+      const arm1Radius = 5.8;
+      const arm2Radius = 4.6;
+      const elbowLocalX = MODEL.arm1Length * Math.cos(degToRad(arm1Deg));
+      const elbowLocalZ = MODEL.baseHeight + (MODEL.arm1Length * Math.sin(degToRad(arm1Deg)));
+
+      const robotPlanarPointToWorld = (localX, localZ) => {
+        const baseRad = degToRad(MODEL.baseHomeDeg + baseDegFromHome + MODEL.armPlaneOffsetDeg);
+        return robotToWorld({
+          x: Math.cos(baseRad) * localX,
+          y: Math.sin(baseRad) * localX,
+          z: localZ,
+        });
+      };
+
+      const shoulderRefPoints = [
+        robotPlanarPointToWorld(0, MODEL.baseHeight),
+        robotPlanarPointToWorld(arm1Radius + 1.4, MODEL.baseHeight),
+      ];
+      angleGroup.add(createDashedLine(shoulderRefPoints, 0x2e6fff));
+
+      const elbowRefPoints = [
+        robotPlanarPointToWorld(elbowLocalX, elbowLocalZ),
+        robotPlanarPointToWorld(
+          elbowLocalX + ((arm2Radius + 1.2) * Math.cos(degToRad(arm1Deg))),
+          elbowLocalZ + ((arm2Radius + 1.2) * Math.sin(degToRad(arm1Deg)))
+        ),
+      ];
+      angleGroup.add(createDashedLine(elbowRefPoints, 0x5cb8ff));
+
+      angleGroup.add(createSolidLine(buildPlanarArcPoints(0, MODEL.baseHeight, arm1Radius, 0, arm1Deg, baseDegFromHome), 0x00d084));
+      angleGroup.add(createSolidLine(buildPlanarArcPoints(elbowLocalX, elbowLocalZ, arm2Radius, arm1Deg, arm2AbsoluteDeg, baseDegFromHome), 0xff8f47));
+
+      const arm1MidDeg = arm1Deg / 2;
+      const arm2MidDeg = arm1Deg + (arm2RelativeDeg / 2);
+      sceneState.overlayAnchors.arm1 = robotPlanarPointToWorld(
+        (arm1Radius + 1.25) * Math.cos(degToRad(arm1MidDeg)),
+        MODEL.baseHeight + ((arm1Radius + 1.25) * Math.sin(degToRad(arm1MidDeg)))
+      );
+      sceneState.overlayAnchors.arm2 = robotPlanarPointToWorld(
+        elbowLocalX + ((arm2Radius + 1.25) * Math.cos(degToRad(arm2MidDeg))),
+        elbowLocalZ + ((arm2Radius + 1.25) * Math.sin(degToRad(arm2MidDeg)))
+      );
+    }
+
+    const baseDirectionArrow = new THREE.ArrowHelper(
+      new THREE.Vector3(1, 0, 0),
+      robotToWorld({ x: 0, y: 0, z: MODEL.baseHeight + 1.6 }),
+      9,
+      0xff8f47,
+      2,
+      1
+    );
+    scene.add(baseDirectionArrow);
+
+    function placeLink(mesh, start, end) {
+      const direction = new THREE.Vector3().subVectors(end, start);
+      const length = direction.length();
+      mesh.position.copy(start).addScaledVector(direction, 0.5);
+      mesh.scale.set(1, length, 1);
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    }
+
+    function projectToScene(worldVector) {
+      const rect = dom.sceneHost.getBoundingClientRect();
+      const projected = worldVector.clone().project(camera);
+      const x = ((projected.x + 1) / 2) * rect.width;
+      const y = ((-projected.y + 1) / 2) * rect.height;
+      const visible = projected.z > -1 && projected.z < 1 && x >= 0 && x <= rect.width && y >= 0 && y <= rect.height;
+      return { x, y, visible };
+    }
+
+    function positionLabel(element, anchor, html, offsetX = 0, offsetY = 0) {
+      if (!anchor) {
+        element.classList.add("floating-label-hidden");
+        return;
+      }
+      const projected = projectToScene(anchor);
+      if (!projected.visible) {
+        element.classList.add("floating-label-hidden");
+        return;
+      }
+      element.innerHTML = html;
+      element.style.left = `${projected.x + offsetX}px`;
+      element.style.top = `${projected.y + offsetY}px`;
+      element.classList.remove("floating-label-hidden");
+    }
+
+    function getLineEndpointsFromForm() {
+      return {
+        start: {
+          x: parseFloat(dom.cartesianStartX.value) || 0,
+          y: parseFloat(dom.cartesianStartY.value) || 0,
+          z: parseFloat(dom.cartesianStartZ.value) || 0,
+        },
+        end: {
+          x: parseFloat(dom.cartesianEndX.value) || 0,
+          y: parseFloat(dom.cartesianEndY.value) || 0,
+          z: parseFloat(dom.cartesianEndZ.value) || 0,
+        },
+      };
+    }
+
+    function updateLinePreview() {
+      const { start, end } = getLineEndpointsFromForm();
+      updateLineGeometry(desiredLine, [robotToWorld(start), robotToWorld(end)]);
+    }
+
+    function getCurrentSpeedCaps() {
+      return {
+        Z: parseInt(dom.speedZ.value, 10) || 1500,
+        X: parseInt(dom.speedX.value, 10) || 1200,
+        Y: parseInt(dom.speedY.value, 10) || 1200,
+      };
+    }
+
+    function shouldMirrorRobotPose(telemetry) {
+      return !sceneState.isDraggingTarget && (
+        !!telemetry?.sequence?.active ||
+        !!telemetry?.cartesian?.active ||
+        (Date.now() < sceneState.followRobotUntil)
+      );
+    }
+
+    function updateSceneModeUI() {
+      const online = sceneState.mode === "online";
+      dom.sceneModeBadge.innerText = online ? "Online" : "Offline";
+      dom.sceneModeToggle.innerText = online ? "ONLINE MODE" : "OFFLINE MODE";
+      dom.sceneModeToggle.classList.toggle("mode-toggle-online", online);
+      dom.sceneModeToggle.classList.toggle("mode-toggle-offline", !online);
+      dom.sceneShell.classList.toggle("scene-shell-online", online);
+      dom.sceneShell.classList.toggle("scene-shell-offline", !online);
+      scene.background = new THREE.Color(online ? 0xf8fffa : 0xfffbfb);
+      scene.fog.color.setHex(online ? 0xf0faf2 : 0xfff6f7);
+      renderer.setClearColor(online ? 0xf8fffa : 0xfffbfb, 1);
+      floor.material.color.setHex(online ? 0xfbfffc : 0xfffdfd);
+    }
+
+    function setSceneTarget(target, { scheduleOnline = true, status = null } = {}) {
+      sceneState.target = {
+        x: clamp(Number(target.x), -55, 55),
+        y: clamp(Number(target.y), -55, 55),
+        z: clamp(Number(target.z), 0, 60),
+      };
+      sceneState.virtualSolution = solveTarget(sceneState.target, sceneState.virtualSolution?.rendered || null);
+      targetMarker.position.copy(robotToWorld(sceneState.target));
+      if (scheduleOnline) {
+        scheduleOnlineMove();
+      }
+      if (status) {
+        document.getElementById("status").innerText = status;
+      }
+      renderScene();
+    }
+
+    function renderPose(rendered, targetPoint, reachable = true) {
+      const shoulder = robotToWorld({ x: 0, y: 0, z: MODEL.baseHeight });
+      const elbow = robotToWorld(rendered.elbow);
+      const wrist = robotToWorld(rendered.endPoint);
+      sceneState.currentWristWorld = wrist.clone();
+      baseJoint.position.copy(shoulder);
+      elbowJoint.position.copy(elbow);
+      wristJoint.position.copy(wrist);
+      placeLink(link1, shoulder, elbow);
+      placeLink(link2, elbow, wrist);
+
+      baseColumn.material = reachable ? baseColumnMaterial : errorMaterial;
+      link1.material = reachable ? link1Material : errorMaterial;
+      link2.material = reachable ? link2Material : errorMaterial;
+      baseJoint.material = reachable ? jointMaterial : errorMaterial;
+      elbowJoint.material = reachable ? jointMaterial : errorMaterial;
+      wristJoint.material = reachable ? jointMaterial : errorMaterial;
+
+      const baseRad = degToRad(MODEL.baseHomeDeg + rendered.baseDegFromHome);
+      baseDirectionArrow.position.copy(shoulder).add(new THREE.Vector3(0, 1.6, 0));
+      baseDirectionArrow.setDirection(new THREE.Vector3(Math.cos(baseRad), 0, -Math.sin(baseRad)).normalize());
+      baseDirectionArrow.setLength(9, 2, 1);
+
+      updateAngleGraphics(rendered);
+      positionLabel(dom.arm1CoordLabel, elbow, `Arm 1<br>X: ${round(rendered.elbow.x)}<br>Y: ${round(rendered.elbow.y)}<br>Z: ${round(rendered.elbow.z)}`, 0, -8);
+      positionLabel(dom.arm2CoordLabel, wrist, `Arm 2<br>X: ${round(rendered.endPoint.x)}<br>Y: ${round(rendered.endPoint.y)}<br>Z: ${round(rendered.endPoint.z)}`, 18, -8);
+      positionLabel(dom.arm1AngleLabel, sceneState.overlayAnchors.arm1, `Arm 1: ${round(rendered.arm1Deg)} deg`, 0, -10);
+      positionLabel(dom.arm2AngleLabel, sceneState.overlayAnchors.arm2, `Arm 2 rel: ${round(rendered.arm2RelativeDeg)} deg`, 0, -10);
+
+      const targetWorld = robotToWorld(targetPoint);
+      targetMarker.position.copy(targetWorld);
+      updateLineGeometry(desiredLine, [wrist, targetWorld]);
+      desiredLine.visible = wrist.distanceTo(targetWorld) > 0.6;
+    }
+
+    function renderScene() {
+      const telemetry = window.latestTelemetry;
+      const robotPose = poseFromTelemetry(telemetry);
+      sceneState.robotPose = robotPose;
+
+      if (robotPose && shouldMirrorRobotPose(telemetry)) {
+        sceneState.target = { ...robotPose.position };
+        sceneState.virtualSolution = solveTarget(sceneState.target, sceneState.virtualSolution?.rendered || null);
+      }
+
+      if (!sceneState.virtualSolution) {
+        sceneState.virtualSolution = solveTarget(sceneState.target);
+      }
+      const renderedPose = sceneState.virtualSolution.rendered;
+      const reachable = !!sceneState.virtualSolution.reachable;
+
+      targetMarker.material.color.setHex(sceneState.virtualSolution?.reachable ? 0xffb547 : 0xff4d67);
+      targetMarker.material.emissive.setHex(sceneState.virtualSolution?.reachable ? 0x5c2d00 : 0x44101a);
+      renderPose(renderedPose, sceneState.target, reachable);
+      updateLinePreview();
+      const signature = JSON.stringify({
+        base: renderedPose.baseDegFromHome,
+        arm1: renderedPose.arm1Deg,
+        arm2: renderedPose.arm2RelativeDeg,
+        target: sceneState.target,
+      });
+      sceneState.lastRenderedSignature = signature;
+    }
+
+    async function sendOnlineMove() {
+      sceneState.onlineSendHandle = null;
+      if (sceneState.mode !== "online" || !sceneState.virtualSolution?.reachable) return;
+      const telemetry = window.latestTelemetry;
+      if (telemetry?.sequence?.active || telemetry?.cartesian?.active) return;
+
+      const positions = candidateToAxisPositions(sceneState.virtualSolution.rendered);
+      if (sceneState.lastSentTargets &&
+          Math.abs(sceneState.lastSentTargets.Z - positions.Z) < 5 &&
+          Math.abs(sceneState.lastSentTargets.X - positions.X) < 5 &&
+          Math.abs(sceneState.lastSentTargets.Y - positions.Y) < 5) {
+        return;
+      }
+
+      try {
+        const response = await fetch("/goto_position", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            positions,
+            max_speeds: getCurrentSpeedCaps(),
+          }),
+        });
+        const data = await response.json();
+        if (data.ok) {
+          sceneState.lastSentTargets = positions;
+        }
+      } catch (error) {
+        console.error("Failed to send online target:", error);
+      }
+    }
+
+    function scheduleOnlineMove() {
+      if (sceneState.mode !== "online") return;
+      if (sceneState.onlineSendHandle) {
+        clearTimeout(sceneState.onlineSendHandle);
+      }
+      sceneState.onlineSendHandle = window.setTimeout(sendOnlineMove, 70);
+    }
+
+    function resetSceneModelHome() {
+      setSceneTarget(
+        computeHomeTarget(),
+        {
+          scheduleOnline: sceneState.mode === "online",
+          status: sceneState.mode === "online" ? "Model reset to home and sent to the robot target." : "Model reset to home.",
+        }
+      );
+    }
+
+    function captureCurrentTarget(kind) {
+      const point = sceneState.target;
+      if (kind === "start") {
+        dom.cartesianStartX.value = round(point.x);
+        dom.cartesianStartY.value = round(point.y);
+        dom.cartesianStartZ.value = round(point.z);
+      } else {
+        dom.cartesianEndX.value = round(point.x);
+        dom.cartesianEndY.value = round(point.y);
+        dom.cartesianEndZ.value = round(point.z);
+      }
+      updateLinePreview();
+      document.getElementById("status").innerText = `Captured ${kind} point from the 3D scene.`;
+    }
+
+    function frameTarget() {
+      orbitControls.target.copy(sceneState.currentWristWorld || robotToWorld(sceneState.target));
+    }
+
+    function startCameraTween(viewName) {
+      const focusPoint = sceneState.virtualSolution?.rendered?.endPoint || sceneState.target;
+      const presets = {
+        home: {
+          position: cameraHomePosition.clone(),
+          target: robotToWorld(focusPoint),
+        },
+        top: {
+          position: robotToWorld({ x: 0, y: 0, z: 92 }),
+          target: robotToWorld(focusPoint),
+        },
+        front: {
+          position: robotToWorld({ x: 72, y: 0, z: 28 }),
+          target: robotToWorld(focusPoint),
+        },
+        back: {
+          position: robotToWorld({ x: -72, y: 0, z: 28 }),
+          target: robotToWorld(focusPoint),
+        },
+        left: {
+          position: robotToWorld({ x: 0, y: 72, z: 28 }),
+          target: robotToWorld(focusPoint),
+        },
+        right: {
+          position: robotToWorld({ x: 0, y: -72, z: 28 }),
+          target: robotToWorld(focusPoint),
+        },
+      };
+
+      const preset = presets[viewName];
+      if (!preset) return;
+
+      sceneState.cameraTween = {
+        startTime: performance.now(),
+        durationMs: 360,
+        startPosition: camera.position.clone(),
+        endPosition: preset.position.clone(),
+        startTarget: orbitControls.target.clone(),
+        endTarget: preset.target.clone(),
+      };
+    }
+
+    function updateCameraTween() {
+      if (!sceneState.cameraTween) return;
+      const elapsed = performance.now() - sceneState.cameraTween.startTime;
+      const t = clamp(elapsed / sceneState.cameraTween.durationMs, 0, 1);
+      const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      camera.position.lerpVectors(sceneState.cameraTween.startPosition, sceneState.cameraTween.endPosition, eased);
+      orbitControls.target.lerpVectors(sceneState.cameraTween.startTarget, sceneState.cameraTween.endTarget, eased);
+      if (t >= 1) {
+        sceneState.cameraTween = null;
+      }
+    }
+
+    function resizeRenderer() {
+      const width = dom.sceneHost.clientWidth;
+      const height = dom.sceneHost.clientHeight;
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    }
+
+    renderer.domElement.addEventListener("pointerdown", () => {});
+
+    transformControls.addEventListener("objectChange", () => {
+      const robotPoint = worldToRobot(targetMarker.position);
+      setSceneTarget(robotPoint, { scheduleOnline: true });
+    });
+
+    window.captureScenePoint = captureCurrentTarget;
+    window.sceneApi = {
+      trackRobotFor(ms = 5000) {
+        sceneState.followRobotUntil = Math.max(sceneState.followRobotUntil, Date.now() + ms);
+      },
+      getCurrentTarget() {
+        return { ...sceneState.target };
+      },
+      resetToHome: resetSceneModelHome,
+    };
+
+    dom.sceneModeToggle.addEventListener("click", () => {
+      sceneState.mode = sceneState.mode === "online" ? "offline" : "online";
+      updateSceneModeUI();
+      renderScene();
+      if (sceneState.mode === "online") {
+        scheduleOnlineMove();
+      }
+    });
+    dom.sceneResetButton.addEventListener("click", resetSceneModelHome);
+    dom.sceneCaptureStart.addEventListener("click", () => captureCurrentTarget("start"));
+    dom.sceneCaptureEnd.addEventListener("click", () => captureCurrentTarget("end"));
+    dom.sceneFrameButton.addEventListener("click", frameTarget);
+    dom.viewFaceButtons.forEach(button => {
+      button.addEventListener("click", () => startCameraTween(button.dataset.view));
+    });
+
+    [
+      dom.cartesianStartX, dom.cartesianStartY, dom.cartesianStartZ,
+      dom.cartesianEndX, dom.cartesianEndY, dom.cartesianEndZ,
+    ].forEach(input => input.addEventListener("input", updateLinePreview));
+
+    window.addEventListener("robot-telemetry", () => {
+      renderScene();
+    });
+    window.addEventListener("resize", resizeRenderer);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      updateCameraTween();
+      if (!sceneState.cameraTween && sceneState.currentWristWorld) {
+        orbitControls.target.lerp(sceneState.currentWristWorld, 0.14);
+      }
+      orbitControls.update();
+      renderer.render(scene, camera);
+    }
+
+    buildWorkspaceCloud();
+    updateSceneModeUI();
+    setSceneTarget(computeHomeTarget(), { scheduleOnline: false });
+    resizeRenderer();
+    updateLinePreview();
+    animate();
+  </script>
+</body>
+</html>

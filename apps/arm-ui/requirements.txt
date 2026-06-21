@@ -1,0 +1,4 @@
+Flask>=3.0
+Flask-SocketIO>=5.3
+eventlet>=0.35
+pyserial>=3.5

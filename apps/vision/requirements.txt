@@ -1,0 +1,7 @@
+Flask>=3.0
+numpy>=1.26
+opencv-python>=4.9
+
+# Raspberry Pi camera runtime. On Raspberry Pi OS this is often installed
+# through apt rather than pip.
+picamera2
